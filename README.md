@@ -67,11 +67,20 @@ AUC Random Forest: 0.9415
 - RStudio ou VSCode
 - Pacotes: tidyverse, caret, nnet, pROC, randomForest, ggplot2
 
-## ✍️ Autor
-Projeto desenvolvido com suporte técnico da OpenAI ChatGPT, adaptado e customizado por Daiane Wan-Dall.
-
 ## 📚 Referências
 
-- ['https://topepo.github.io/caret/index.html']Documentação caret
-- ['https://cran.r-project.org/web/packages/pROC/pROC.pdf']Documentação pROC
-- ['https://cran.r-project.org/web/packages/nnet/nnet.pdf']Documentação nnet
+- [Documentação caret](https://topepo.github.io/caret/index.html)
+- [Documentação pROC](https://cran.r-project.org/web/packages/pROC/pROC.pdf)
+- [Documentação nnet](https://cran.r-project.org/web/packages/nnet/nnet.pdf)
+
+<details>
+
+<summary></summary>
+
+## ✍️ Autoria
+Projeto desenvolvido para o Mestrado Profissional em Computação Aplicada - UNIVALI
+Matéria: INTRODUÇÃO A INTELIGENCIA ARTIFICIAL
+Auxílio de suporte técnico da OpenAI ChatGPT
+Adaptado e customizado por <a href="https://github.com/DWan-Dall">DWD💜</a>.
+
+</details>
