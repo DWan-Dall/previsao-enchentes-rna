@@ -1,45 +1,77 @@
-usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
-           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
-           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
-           <command> [<args>]
+# Previsão de Enchentes com Redes Neurais Artificiais 🌧️🤖
 
-These are common Git commands used in various situations:
+Este projeto utiliza técnicas de Machine Learning (Redes Neurais e Random Forest) para prever a ocorrência de enchentes em cidades de Santa Catarina (Brasil), baseado em dados meteorológicos e geográficos.
 
-start a working area (see also: git help tutorial)
-   clone     Clone a repository into a new directory
-   init      Create an empty Git repository or reinitialize an existing one
+---
 
-work on the current change (see also: git help everyday)
-   add       Add file contents to the index
-   mv        Move or rename a file, a directory, or a symlink
-   restore   Restore working tree files
-   rm        Remove files from the working tree and from the index
+## 📁 Estrutura do Projeto
 
-examine the history and state (see also: git help revisions)
-   bisect    Use binary search to find the commit that introduced a bug
-   diff      Show changes between commits, commit and working tree, etc
-   grep      Print lines matching a pattern
-   log       Show commit logs
-   show      Show various types of objects
-   status    Show the working tree status
+- `Previsao_Enchentes.R`: Script principal de análise, modelagem, avaliação e exportação de resultados.
+- `dataset_enchentes_sc.csv`: Base de dados utilizada para treinamento e teste dos modelos.
+- `resultados/`: Pasta gerada automaticamente contendo:
+  - `matriz_confusao_rna.csv`
+  - `matriz_confusao_rf.csv`
+  - `auc_resultados.txt`
+  - `curva_roc_comparativa.png`
 
-grow, mark and tweak your common history
-   branch    List, create, or delete branches
-   commit    Record changes to the repository
-   merge     Join two or more development histories together
-   rebase    Reapply commits on top of another base tip
-   reset     Reset current HEAD to the specified state
-   switch    Switch branches
-   tag       Create, list, delete or verify a tag object signed with GPG
+## 🚀 Como Executar o Projeto
 
-collaborate (see also: git help workflows)
-   fetch     Download objects and refs from another repository
-   pull      Fetch from and integrate with another repository or a local branch
-   push      Update remote refs along with associated objects
+1. Instale os pacotes necessários no R:
 
-'git help -a' and 'git help -g' list available subcommands and some
-concept guides. See 'git help <command>' or 'git help <concept>'
-to read about a specific subcommand or concept.
-See 'git help git' for an overview of the system.
+```r
+install.packages(c("tidyverse", "caret", "nnet", "pROC", "randomForest", "ggplot2"))
+```
+
+2. Abra o arquivo Previsao_Enchentes.R no RStudio ou VSCode.
+
+3. Execute o script linha por linha ou clique em Knit para gerar um relatório em HTML (Recurso do RStudio). 
+
+4. Após a execução:
+
+- A pasta 'resultados/' será criada
+- Matrizes de confusão, gráficos e métricas de avaliação serão salvos automaticamente.
+
+## 📊 Técnicas Utilizadas
+
+- Normalização de variáveis
+- Particionamento treino/teste
+- Redes Neurais Artificiais (RNA/nnet)
+- Random Forest (RF)
+- Validação Cruzada (caret)
+- Avaliação por Curva ROC e AUC (pROC)
+- Visualização de dados (ggplot2) através dos gráficos gerados e salvando automaticamente na pasta resultados/
+
+
+## 📈 Exemplos de Resultados
+
+### 🎯 Gráfico Comparativo das Curvas ROC
+
+<p align="center">
+
+### 📄 Arquivos Gerados
+
+- Matriz de Confusão RNA (matriz_confusao_rna.csv)
+- Matriz de Confusão Random Forest (matriz_confusao_rf.csv)
+- Resultados de AUC (auc_resultados.txt)
+
+Exemplo de conteúdo do auc_resultados.txt:
+
+```nginx
+AUC RNA: 0.8921
+AUC Random Forest: 0.9415
+```
+
+## 📜 Requisitos
+
+- R (versão >= 4.0)
+- RStudio ou VSCode
+- Pacotes: tidyverse, caret, nnet, pROC, randomForest, ggplot2
+
+## ✍️ Autor
+Projeto desenvolvido com suporte técnico da OpenAI ChatGPT, adaptado e customizado por Daiane Wan-Dall.
+
+## 📚 Referências
+
+- ['https://topepo.github.io/caret/index.html']Documentação caret
+- ['https://cran.r-project.org/web/packages/pROC/pROC.pdf']Documentação pROC
+- ['https://cran.r-project.org/web/packages/nnet/nnet.pdf']Documentação nnet
