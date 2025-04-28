@@ -1,4 +1,9 @@
-Output created: Previsao_Enchentes.html
+> library(tidyverse)
+library(caret)
+library(nnet)
+library(pROC)
+library(randomForest)
+library(ggplot2)
 > if (!dir.exists("resultados")) {
   dir.create("resultados")
 }
@@ -63,7 +68,8 @@ i20->h5 i21->h5 i22->h5 i23->h5 i24->h5 i25->h5 i26->h5
  b->o h1->o h2->o h3->o h4->o h5->o 
  2.36 -2.32 -3.50 -2.30 -2.30 -1.78 
 > ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
-> train_data$enchente <- as.factor(ifelse(train_data$enchente == 1, "Sim", "Não"))
+> # Ajustar a variável target para "Sim"/"Não"
+train_data$enchente <- as.factor(ifelse(train_data$enchente == 1, "Sim", "Não"))
 > test_data$enchente <- as.factor(ifelse(test_data$enchente == 1, "Sim", "Não"))
 > set.seed(123)
 > modelo_rna <- train(enchente ~ precipitacao_mm + umidade_solo + nivel_mar_m + elevacao_m + uso_solo + cidade,
@@ -117,7 +123,10 @@ Resampling results across tuning parameters:
 
 ROC was used to select the optimal model using the largest value.
 The final values used for the model were size = 7 and decay = 1e-04.
-> set.seed(123)
+
+> ## 4. Treinamento do Random Forest (Baseline)
+
+set.seed(123)
 > modelo_rf <- train(enchente ~ precipitacao_mm + umidade_solo + nivel_mar_m + elevacao_m + uso_solo + cidade,
                    data = train_data,
                    method = "rf",
@@ -146,12 +155,15 @@ Resampling results across tuning parameters:
 
 ROC was used to select the optimal model using the largest value.
 The final value used for the model was mtry = 14.
-> pred_rna <- predict(modelo_rna, newdata = test_data)
+
+> ## 5. Avaliação dos Modelos
+
+# Previsões RNA e RF
+pred_rna <- predict(modelo_rna, newdata = test_data)
 > pred_rf <- predict(modelo_rf, newdata = test_data)
 > # Matrizes de confusão
 conf_rna <- confusionMatrix(pred_rna, test_data$enchente)
 > conf_rf <- confusionMatrix(pred_rf, test_data$enchente)
-> conf_rna <- confusionMatrix(pred_rna, test_data$enchente)
 > print(conf_rna)
 Confusion Matrix and Statistics
 
@@ -216,6 +228,7 @@ roc_rna <- roc(response = test_data$enchente, predictor = prob_rna, levels = rev
 Setting direction: controls > cases
 > roc_rf <- roc(response = test_data$enchente, predictor = prob_rf, levels = rev(levels(test_data$enchente)))
 Setting direction: controls > cases
+
 > ## 6. Visualização das Curvas ROC
 
 # Preparar dados para ggplot
@@ -223,7 +236,7 @@ roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specif
 > roc_rf_data <- data.frame(TPR = roc_rf$sensitivities, FPR = 1 - roc_rf$specificities, Modelo = "Random Forest")
 > roc_data <- bind_rows(roc_rna_data, roc_rf_data)
 > grafico_roc <- ggplot(roc_data, aes(x = FPR, y = TPR, color = Modelo)) +
-  geom_line(size = 1.2) +
+  geom_line(linewidth = 1.2) +
   geom_abline(linetype = "dashed", color = "gray") +
   theme_minimal(base_size = 14) +
   labs(
@@ -238,12 +251,9 @@ roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specif
     plot.subtitle = element_text(size = 12),
     legend.position = "bottom"
   )
-Mensagen de aviso:
-Using size aesthetic for lines was deprecated in ggplot2 3.4.0.
-ℹ Please use linewidth instead.
-This warning is displayed once every 8 hours.
-Call lifecycle::last_lifecycle_warnings() to see where this warning was generated. 
-> print(grafico_roc)
+> # Mostrar o gráfico
+print(grafico_roc) 
+
 > # Salvar o gráfico
 ggsave("resultados/curva_roc_comparativa.png", plot = grafico_roc, width = 8, height = 6, dpi = 300)
 > ## 7. Salvar Resultados em Arquivos
@@ -263,3 +273,5 @@ auc_rna <- auc(roc_rna)
 AUC RNA: 1 
 > cat("AUC Random Forest:", auc_rf, "\n")
 AUC Random Forest: 0.9775281 
+> 
+

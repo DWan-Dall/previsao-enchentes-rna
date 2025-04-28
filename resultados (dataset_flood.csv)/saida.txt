@@ -1,4 +1,1190 @@
-...
+> library(tidyverse)
+library(caret)
+library(nnet)
+library(pROC)
+library(randomForest)
+library(ggplot2)
+> if (!dir.exists("resultados")) {
+  dir.create("resultados")
+}
+> dados <- read.csv("dataset_flood.csv")
+str(dados)
+'data.frame':   50000 obs. of  21 variables:
+ $ MonsoonIntensity               : int  3 8 3 4 3 6 6 7 6 4 ...
+ $ TopographyDrainage             : int  8 4 10 4 7 6 7 3 3 3 ...
+ $ RiverManagement                : int  6 5 4 2 5 6 4 5 5 5 ...
+ $ Deforestation                  : int  6 7 1 7 2 4 5 5 4 6 ...
+ $ Urbanization                   : int  4 7 7 3 5 6 5 6 5 2 ...
+ $ ClimateChange                  : int  4 9 5 4 8 4 5 6 11 3 ...
+ $ DamsQuality                    : int  6 1 4 1 5 3 4 6 3 7 ...
+ $ Siltation                      : int  2 5 7 4 2 1 8 7 2 7 ...
+ $ AgriculturalPractices          : int  3 5 4 6 7 3 8 6 9 10 ...
+ $ Encroachments                  : int  2 4 9 4 5 5 4 5 7 4 ...
+ $ IneffectiveDisasterPreparedness: int  5 6 2 9 7 1 6 5 8 5 ...
+ $ DrainageSystems                : int  10 9 7 4 7 10 8 4 2 7 ...
+ $ CoastalVulnerability           : int  7 2 4 2 6 5 4 6 8 6 ...
+ $ Landslides                     : int  4 6 4 6 5 9 5 9 7 5 ...
+ $ Watersheds                     : int  2 2 8 6 3 5 4 7 5 6 ...
+ $ DeterioratingInfrastructure    : int  3 1 6 8 3 5 7 10 4 7 ...
+ $ PopulationScore                : int  4 1 1 8 4 7 7 6 9 5 ...
+ $ WetlandLoss                    : int  3 9 8 6 4 3 5 5 6 7 ...
+ $ InadequatePlanning             : int  2 1 3 6 3 3 4 4 5 4 ...
+ $ PoliticalFactors               : int  6 3 6 10 4 2 8 5 7 8 ...
+ $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
+
+ > ## 2. Pré-processamento dos dados
+
+# Converter variáveis categóricas para fator (dados)
+dados$FloodProbability <- as.factor(dados$FloodProbability)
+> dados_norm <- dados %>%
+  mutate(across(
+    .cols = c(
+      MonsoonIntensity, TopographyDrainage, RiverManagement, Deforestation, Urbanization,
+      ClimateChange, DamsQuality, Siltation, AgriculturalPractices, Encroachments,
+      IneffectiveDisasterPreparedness, DrainageSystems, CoastalVulnerability, Landslides,
+      Watersheds, DeterioratingInfrastructure, PopulationScore, WetlandLoss,
+      InadequatePlanning, PoliticalFactors
+    ),
+    .fns = scale
+  ))
+> # Conferir se deu certo
+str(dados_norm)
+'data.frame':   50000 obs. of  21 variables:
+ $ MonsoonIntensity               : num [1:50000, 1] -0.89 1.345 -0.89 -0.443 -0.89 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ TopographyDrainage             : num [1:50000, 1] 1.342 -0.438 2.233 -0.438 0.897 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ RiverManagement                : num [1:50000, 1] 0.44102 -0.00714 -0.45531 -1.35165 -0.00714 ...
+  ..- attr(*, "scaled:center")= num 5.02
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Deforestation                  : num [1:50000, 1] 0.446 0.896 -1.803 0.896 -1.353 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.22
+ $ Urbanization                   : num [1:50000, 1] -0.44092 0.89648 0.89648 -0.88672 0.00488 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ ClimateChange                  : num [1:50000, 1] -0.44385 1.80157 0.00524 -0.44385 1.35248 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DamsQuality                    : num [1:50000, 1] 0.43859 -1.78858 -0.45228 -1.78858 -0.00684 ...
+  ..- attr(*, "scaled:center")= num 5.02
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ Siltation                      : num [1:50000, 1] -1.33859 0.00511 0.90091 -0.44279 -1.33859 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ AgriculturalPractices          : num [1:50000, 1] -0.89776 -0.00274 -0.45025 0.44477 0.89228 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Encroachments                  : num [1:50000, 1] -1.34116 -0.44895 1.78157 -0.44895 -0.00285 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ IneffectiveDisasterPreparedness: num [1:50000, 1] -0.00226 0.44697 -1.34992 1.79463 0.89619 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DrainageSystems                : num [1:50000, 1] 2.231 1.785 0.891 -0.45 0.891 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ CoastalVulnerability           : num [1:50000, 1] 0.89 -1.335 -0.445 -1.335 0.445 ...
+  ..- attr(*, "scaled:center")= num 5
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ Landslides                     : num [1:50000, 1] -0.4418 0.45597 -0.4418 0.45597 0.00708 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Watersheds                     : num [1:50000, 1] -1.335 -1.335 1.353 0.457 -0.887 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DeterioratingInfrastructure    : num [1:50000, 1] -0.891 -1.788 0.453 1.35 -0.891 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ PopulationScore                : num [1:50000, 1] -0.44 -1.78 -1.78 1.35 -0.44 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ WetlandLoss                    : num [1:50000, 1] -0.898 1.79 1.342 0.446 -0.45 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ InadequatePlanning             : num [1:50000, 1] -1.343 -1.791 -0.894 0.451 -0.894 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ PoliticalFactors               : num [1:50000, 1] 0.449 -0.886 0.449 2.23 -0.441 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ FloodProbability               : Factor w/ 83 levels "0.285","0.315",..: 29 34 42 43 34 33 53 56 55 50 ...
+> # Separar em treino (70%) e teste (30%)
+set.seed(123)
+> train_index <- createDataPartition(dados_norm$FloodProbability, p = 0.7, list = FALSE)
+Mensagen de aviso:
+In createDataPartition(dados_norm$FloodProbability, p = 0.7, list = FALSE) :
+  Some classes have a single record ( 0.285, 0.7, 0.71, 0.715, 0.725 ) and these will be selected for the sample
+> train_data <- dados_norm[train_index, ]
+> test_data <- dados_norm[-train_index, ]
+> modelo <- nnet(FloodProbability ~ .,
+               data = train_data, size = 5, decay = 0.01, maxit = 200, trace = FALSE)
+> summary(modelo)
+a 20-5-83 network with 603 weights
+options were - softmax modelling  decay=0.01
+  b->h1  i1->h1  i2->h1  i3->h1  i4->h1  i5->h1  i6->h1  i7->h1  i8->h1  i9->h1 
+ -87.69    1.34   -0.21   -3.88    5.69   -0.42    5.68    4.11   -0.53   -2.71 
+i10->h1 i11->h1 i12->h1 i13->h1 i14->h1 i15->h1 i16->h1 i17->h1 i18->h1 i19->h1 
+  -6.92   -0.87    1.22   -1.05   -3.25    4.42   -4.40  -21.28    4.53   -7.39 
+i20->h1 
+  -1.05 
+  b->h2  i1->h2  i2->h2  i3->h2  i4->h2  i5->h2  i6->h2  i7->h2  i8->h2  i9->h2 
+ -63.58    2.43   -6.05   -2.34    4.40   -1.82    1.76   -2.11    1.75   -3.29 
+i10->h2 i11->h2 i12->h2 i13->h2 i14->h2 i15->h2 i16->h2 i17->h2 i18->h2 i19->h2 
+  -2.51  -10.00    0.30   -7.14   -8.43    3.74   -1.22   -2.31   -5.18    0.30 
+i20->h2 
+  -0.29 
+  b->h3  i1->h3  i2->h3  i3->h3  i4->h3  i5->h3  i6->h3  i7->h3  i8->h3  i9->h3 
+-130.35    4.33  -16.46   -6.28   -2.03   -6.22    3.11    0.41  -16.90  -19.03 
+i10->h3 i11->h3 i12->h3 i13->h3 i14->h3 i15->h3 i16->h3 i17->h3 i18->h3 i19->h3 
+   6.90    1.99   -5.28   -0.91    3.65  -12.25    5.76  -14.77   -3.01    1.66 
+i20->h3 
+ -11.05 
+  b->h4  i1->h4  i2->h4  i3->h4  i4->h4  i5->h4  i6->h4  i7->h4  i8->h4  i9->h4 
+  -7.85    1.64    1.63    1.61    1.60    1.64    1.61    1.62    1.59    1.63 
+i10->h4 i11->h4 i12->h4 i13->h4 i14->h4 i15->h4 i16->h4 i17->h4 i18->h4 i19->h4 
+   1.63    1.62    1.63    1.63    1.64    1.62    1.57    1.60    1.63    1.62 
+i20->h4 
+   1.60 
+  b->h5  i1->h5  i2->h5  i3->h5  i4->h5  i5->h5  i6->h5  i7->h5  i8->h5  i9->h5 
+   0.64    0.92    0.95    0.91    0.92    0.93    0.92    0.94    0.92    0.92 
+i10->h5 i11->h5 i12->h5 i13->h5 i14->h5 i15->h5 i16->h5 i17->h5 i18->h5 i19->h5 
+   0.94    0.93    0.92    0.92    0.93    0.91    0.91    0.91    0.93    0.90 
+i20->h5 
+   0.93 
+  b->o1  h1->o1  h2->o1  h3->o1  h4->o1  h5->o1 
+  15.71   -6.86  -10.78   -7.18   -6.16  -13.08 
+  b->o2  h1->o2  h2->o2  h3->o2  h4->o2  h5->o2 
+  18.09   -0.96   -2.20   -1.36   -0.87  -13.68 
+  b->o3  h1->o3  h2->o3  h3->o3  h4->o3  h5->o3 
+  17.08   -2.06   -4.60   -2.87   -2.03  -19.92 
+  b->o4  h1->o4  h2->o4  h3->o4  h4->o4  h5->o4 
+  16.94   -4.17   -6.85   -5.80   -4.67  -20.24 
+  b->o5  h1->o5  h2->o5  h3->o5  h4->o5  h5->o5 
+  16.23   -3.31   -5.73   -4.61   -4.32  -20.03 
+  b->o6  h1->o6  h2->o6  h3->o6  h4->o6  h5->o6 
+  19.24   -7.96  -12.83   -9.55   -9.52  -18.79 
+  b->o7  h1->o7  h2->o7  h3->o7  h4->o7  h5->o7 
+  19.33  -12.03  -15.86  -12.74  -10.75  -36.52 
+  b->o8  h1->o8  h2->o8  h3->o8  h4->o8  h5->o8 
+  22.49   -0.15   -1.53   16.82    1.88  -34.62 
+  b->o9  h1->o9  h2->o9  h3->o9  h4->o9  h5->o9 
+  24.37   -7.09  -11.06   -6.71   -6.51  -47.56 
+ b->o10 h1->o10 h2->o10 h3->o10 h4->o10 h5->o10 
+  24.28   -2.12   -3.12   -1.66    3.14  -43.04 
+ b->o11 h1->o11 h2->o11 h3->o11 h4->o11 h5->o11 
+  24.59   -5.52   -8.85   -6.53    6.18  -52.44 
+ b->o12 h1->o12 h2->o12 h3->o12 h4->o12 h5->o12 
+  25.91   -7.70  -16.14  -12.16   11.46  -66.05 
+ b->o13 h1->o13 h2->o13 h3->o13 h4->o13 h5->o13 
+  27.16   -9.24   -9.55   -7.98   -7.59 -107.02 
+ b->o14 h1->o14 h2->o14 h3->o14 h4->o14 h5->o14 
+  27.50   -5.97   -5.06   -2.95   -6.48 -107.17 
+ b->o15 h1->o15 h2->o15 h3->o15 h4->o15 h5->o15 
+  27.51   -6.97   -6.30   -2.90   -7.21 -123.32 
+ b->o16 h1->o16 h2->o16 h3->o16 h4->o16 h5->o16 
+  27.55   -4.99   -4.18   -3.94   -8.56 -118.31 
+ b->o17 h1->o17 h2->o17 h3->o17 h4->o17 h5->o17 
+  27.51   -6.32   -1.72   -0.68   -5.30  -90.19 
+ b->o18 h1->o18 h2->o18 h3->o18 h4->o18 h5->o18 
+  27.98  -12.67  -10.03   -3.71   -7.96 -105.71 
+ b->o19 h1->o19 h2->o19 h3->o19 h4->o19 h5->o19 
+  28.49   -6.07   -1.76   -1.98   -5.89 -116.74 
+ b->o20 h1->o20 h2->o20 h3->o20 h4->o20 h5->o20 
+  28.96  -16.56   -9.04    6.24  -10.80 -130.64 
+ b->o21 h1->o21 h2->o21 h3->o21 h4->o21 h5->o21 
+  29.11  -11.19   -8.57   -1.96   -4.67 -138.04 
+ b->o22 h1->o22 h2->o22 h3->o22 h4->o22 h5->o22 
+  29.52    2.00    0.01    2.97   18.62 -145.48 
+ b->o23 h1->o23 h2->o23 h3->o23 h4->o23 h5->o23 
+  29.71   -2.85  -12.35   -4.05  -12.13 -161.34 
+ b->o24 h1->o24 h2->o24 h3->o24 h4->o24 h5->o24 
+  29.69   10.26    3.11   -5.22   34.70 -147.28 
+ b->o25 h1->o25 h2->o25 h3->o25 h4->o25 h5->o25 
+  30.27   -1.47   -7.04    0.99    5.89 -171.07 
+ b->o26 h1->o26 h2->o26 h3->o26 h4->o26 h5->o26 
+  30.03  -38.01  -18.53  -16.26  -28.16 -145.57 
+ b->o27 h1->o27 h2->o27 h3->o27 h4->o27 h5->o27 
+  30.02    6.02   -5.93    0.08   23.41 -133.02 
+ b->o28 h1->o28 h2->o28 h3->o28 h4->o28 h5->o28 
+  29.53  -27.11  -36.14  -18.56  -16.15  -93.62 
+ b->o29 h1->o29 h2->o29 h3->o29 h4->o29 h5->o29 
+  28.94  -11.07   27.40    5.98    3.38  -64.33 
+ b->o30 h1->o30 h2->o30 h3->o30 h4->o30 h5->o30 
+  28.32   10.43    5.45    1.16   46.33  -46.77 
+ b->o31 h1->o31 h2->o31 h3->o31 h4->o31 h5->o31 
+  27.84  -18.88   28.31    8.05  -18.45  -39.80 
+ b->o32 h1->o32 h2->o32 h3->o32 h4->o32 h5->o32 
+  26.67  -16.08   22.91    5.75  -11.58  -24.57 
+ b->o33 h1->o33 h2->o33 h3->o33 h4->o33 h5->o33 
+  25.52    0.05   26.16    9.03  -12.21  -13.98 
+ b->o34 h1->o34 h2->o34 h3->o34 h4->o34 h5->o34 
+  23.66  -29.20   44.82    2.46  -45.67   -2.38 
+ b->o35 h1->o35 h2->o35 h3->o35 h4->o35 h5->o35 
+  21.93   10.07   23.64    9.70  -52.35    4.66 
+ b->o36 h1->o36 h2->o36 h3->o36 h4->o36 h5->o36 
+  19.68  -40.88  -22.12   -2.54  -60.08   12.45 
+ b->o37 h1->o37 h2->o37 h3->o37 h4->o37 h5->o37 
+  15.33    5.89   26.22    9.64   11.67   22.90 
+ b->o38 h1->o38 h2->o38 h3->o38 h4->o38 h5->o38 
+  12.06   -9.79    7.58    5.40    7.26   29.42 
+ b->o39 h1->o39 h2->o39 h3->o39 h4->o39 h5->o39 
+   5.36  -10.63  -19.81    0.47   -0.80   40.32 
+ b->o40 h1->o40 h2->o40 h3->o40 h4->o40 h5->o40 
+  -1.59  -33.16   11.59    7.93   -4.31   50.13 
+ b->o41 h1->o41 h2->o41 h3->o41 h4->o41 h5->o41 
+ -11.95  -11.88   21.36    9.43  -21.52   63.57 
+ b->o42 h1->o42 h2->o42 h3->o42 h4->o42 h5->o42 
+ -28.84  -14.18   12.64    8.44  -51.68   83.92 
+ b->o43 h1->o43 h2->o43 h3->o43 h4->o43 h5->o43 
+ -72.61    6.05   22.38   12.01 -224.19  134.22 
+ b->o44 h1->o44 h2->o44 h3->o44 h4->o44 h5->o44 
+ -76.40   -3.22   20.29    9.73  -88.85  136.56 
+ b->o45 h1->o45 h2->o45 h3->o45 h4->o45 h5->o45 
+-117.15   -0.31   32.09   13.15 -113.74  180.25 
+ b->o46 h1->o46 h2->o46 h3->o46 h4->o46 h5->o46 
+-100.66    1.02   31.85   15.77  -46.94  159.97 
+ b->o47 h1->o47 h2->o47 h3->o47 h4->o47 h5->o47 
+ -73.06   -2.27   34.08    8.90  -24.01  129.51 
+ b->o48 h1->o48 h2->o48 h3->o48 h4->o48 h5->o48 
+ -41.55   27.45   12.45    3.06   -7.26   94.57 
+ b->o49 h1->o49 h2->o49 h3->o49 h4->o49 h5->o49 
+ -96.18    7.70  -10.80    6.50   -2.28  148.21 
+ b->o50 h1->o50 h2->o50 h3->o50 h4->o50 h5->o50 
+ -24.42   30.91   14.70   10.06    4.85   72.82 
+ b->o51 h1->o51 h2->o51 h3->o51 h4->o51 h5->o51 
+  -9.86   36.26   12.63   14.02    8.49   55.79 
+ b->o52 h1->o52 h2->o52 h3->o52 h4->o52 h5->o52 
+  -5.35   39.10   14.92   13.57   11.64   48.74 
+ b->o53 h1->o53 h2->o53 h3->o53 h4->o53 h5->o53 
+  -2.22   39.32    8.75   11.47   14.92   42.54 
+ b->o54 h1->o54 h2->o54 h3->o54 h4->o54 h5->o54 
+   3.06   33.13   -6.98    1.39   17.38   35.20 
+ b->o55 h1->o55 h2->o55 h3->o55 h4->o55 h5->o55 
+   5.80   43.35    7.93    8.18   18.54   30.97 
+ b->o56 h1->o56 h2->o56 h3->o56 h4->o56 h5->o56 
+   8.36   43.22   -0.87    5.30   21.53   25.82 
+ b->o57 h1->o57 h2->o57 h3->o57 h4->o57 h5->o57 
+   2.30   20.51   -1.88    4.15   17.81   34.83 
+ b->o58 h1->o58 h2->o58 h3->o58 h4->o58 h5->o58 
+  -3.86   15.63   -1.82    0.06   28.96   29.96 
+ b->o59 h1->o59 h2->o59 h3->o59 h4->o59 h5->o59 
+   3.11    6.10  -11.19   -3.32   18.68   32.65 
+ b->o60 h1->o60 h2->o60 h3->o60 h4->o60 h5->o60 
+  -0.33   12.68   -3.63   -0.41   19.12   35.78 
+ b->o61 h1->o61 h2->o61 h3->o61 h4->o61 h5->o61 
+  -2.70   23.12   -0.19    0.54   45.20   12.55 
+ b->o62 h1->o62 h2->o62 h3->o62 h4->o62 h5->o62 
+ -33.51   17.37   -4.08   -0.02   25.25   62.56 
+ b->o63 h1->o63 h2->o63 h3->o63 h4->o63 h5->o63 
+ -71.26   -4.93  -18.57  -12.98   20.64  104.27 
+ b->o64 h1->o64 h2->o64 h3->o64 h4->o64 h5->o64 
+ -66.98   -0.83   -8.05   -6.11   18.21  102.26 
+ b->o65 h1->o65 h2->o65 h3->o65 h4->o65 h5->o65 
+ -56.22  -10.90  -20.00  -12.05   17.81   91.35 
+ b->o66 h1->o66 h2->o66 h3->o66 h4->o66 h5->o66 
+ -53.20   -2.37   -4.28   -3.40   45.57   61.43 
+ b->o67 h1->o67 h2->o67 h3->o67 h4->o67 h5->o67 
+ -30.58    6.56   -2.53    0.65   28.69   54.65 
+ b->o68 h1->o68 h2->o68 h3->o68 h4->o68 h5->o68 
+ -30.58    2.94   -3.40   -1.56   22.76   59.71 
+ b->o69 h1->o69 h2->o69 h3->o69 h4->o69 h5->o69 
+  -6.93    6.19   -3.38   -2.23   17.97   41.91 
+ b->o70 h1->o70 h2->o70 h3->o70 h4->o70 h5->o70 
+   2.42   -0.02   -3.96   -2.96   30.61   19.96 
+ b->o71 h1->o71 h2->o71 h3->o71 h4->o71 h5->o71 
+   9.75    4.77   -4.21   -0.66   19.57   22.33 
+ b->o72 h1->o72 h2->o72 h3->o72 h4->o72 h5->o72 
+  12.30   -2.57   -2.95   -3.73   20.06   16.98 
+ b->o73 h1->o73 h2->o73 h3->o73 h4->o73 h5->o73 
+   7.72   -4.11   -8.44   -4.64   16.34   25.44 
+ b->o74 h1->o74 h2->o74 h3->o74 h4->o74 h5->o74 
+   8.01   -2.72   -8.87   -7.29   25.86   16.82 
+ b->o75 h1->o75 h2->o75 h3->o75 h4->o75 h5->o75 
+  -3.98   -4.79  -10.74   -7.03   27.48   25.54 
+ b->o76 h1->o76 h2->o76 h3->o76 h4->o76 h5->o76 
+  -6.81   -4.22   -8.11   -5.99   36.26   20.08 
+ b->o77 h1->o77 h2->o77 h3->o77 h4->o77 h5->o77 
+   8.23    2.16   -3.84   -1.85   25.39   17.25 
+ b->o78 h1->o78 h2->o78 h3->o78 h4->o78 h5->o78 
+   5.19   -0.41   -3.97   -2.99   26.29   16.89 
+ b->o79 h1->o79 h2->o79 h3->o79 h4->o79 h5->o79 
+   3.61   -4.27   -9.48   -7.77   20.67   23.44 
+ b->o80 h1->o80 h2->o80 h3->o80 h4->o80 h5->o80 
+  -0.96   -5.34   -8.52   -4.63   27.60   21.53 
+ b->o81 h1->o81 h2->o81 h3->o81 h4->o81 h5->o81 
+   5.66   -3.94   -8.16   -4.52   23.29   20.80 
+ b->o82 h1->o82 h2->o82 h3->o82 h4->o82 h5->o82 
+   2.35   -2.85   -6.77   -4.99   27.69   19.19 
+ b->o83 h1->o83 h2->o83 h3->o83 h4->o83 h5->o83 
+   1.71   -5.30   -5.67   -4.00   27.03   19.62 
+> # Treinamento com validação cruzada
+ctrl <- trainControl(method = "cv", number = 5)
+> # ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+
+# Ajustar a variável target para "Sim"/"Não"
+# train_data$enchente <- as.factor(ifelse(train_data$enchente == 1, "Sim", "Não"))
+# test_data$enchente <- as.factor(ifelse(test_data$enchente == 1, "Sim", "Não"))
+
+set.seed(123)
+set.seed(123)
+> 
+> modelo_rna <- train(FloodProbability ~ .,
+                    data = train_data,
+                    method = "nnet",
+                    trControl = ctrl,
+                    # metric = "ROC",
+                    tuneLength = 5,
+                    trace = FALSE)
+Houve 50 ou mais avisos (use warnings() para ver os primeiros 50)
+> warnings()
+Mensagens de aviso:
+1: model fit failed for Fold1: size=9, decay=0e+00 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1019) weights
+
+2: model fit failed for Fold1: size=9, decay=1e-01 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1019) weights
+
+3: model fit failed for Fold1: size=9, decay=1e-02 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1019) weights
+
+4: model fit failed for Fold1: size=9, decay=1e-03 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1019) weights
+
+5: model fit failed for Fold1: size=9, decay=1e-04 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1019) weights
+
+6: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+7: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+8: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+9: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+10: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+11: model fit failed for Fold2: size=9, decay=0e+00 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1009) weights
+
+12: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+13: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+14: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+15: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+16: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+17: model fit failed for Fold2: size=9, decay=1e-01 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1009) weights
+
+18: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+19: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+20: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+21: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+22: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+23: model fit failed for Fold2: size=9, decay=1e-02 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1009) weights
+
+24: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+25: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+26: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+27: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+28: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+29: model fit failed for Fold2: size=9, decay=1e-03 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1009) weights
+
+30: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+31: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+32: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+33: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+34: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  group ‘0.715’ is empty
+35: model fit failed for Fold2: size=9, decay=1e-04 Error in nnet.default(x, y, w, softmax = TRUE, ...) : 
+  too many (1009) weights
+
+36: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+37: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+38: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+39: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+40: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+41: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+42: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+43: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+44: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+45: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+46: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+47: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+48: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+49: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+50: In nnet.formula(.outcome ~ ., data = dat, size = param$size,  ... :
+  groups ‘0.285’ ‘0.725’ are empty
+> 
+
+> print(modelo_rna)
+Neural Network 
+
+35042 samples
+   20 predictor
+   83 classes: '0.285', '0.315', '0.32', '0.325', '0.33', '0.335', '0.34', '0.345', '0.35', '0.355', '0.36', '0.365', '0.37', '0.375', '0.38', '0.385', '0.39', '0.395', '0.4', '0.405', '0.41', '0.415', '0.42', '0.425', '0.43', '0.435', '0.44', '0.445', '0.45', '0.455', '0.46', '0.465', '0.47', '0.475', '0.48', '0.485', '0.49', '0.495', '0.5', '0.505', '0.51', '0.515', '0.52', '0.525', '0.53', '0.535', '0.54', '0.545', '0.55', '0.555', '0.56', '0.565', '0.57', '0.575', '0.58', '0.585', '0.59', '0.595', '0.6', '0.605', '0.61', '0.615', '0.62', '0.625', '0.63', '0.635', '0.64', '0.645', '0.65', '0.655', '0.66', '0.665', '0.67', '0.675', '0.68', '0.685', '0.69', '0.695', '0.7', '0.705', '0.71', '0.715', '0.725' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 28034, 28036, 28033, 28036, 28029 
+Resampling results across tuning parameters:
+
+  size  decay  Accuracy    Kappa     
+  1     0e+00  0.13974147  0.10708388
+  1     1e-04  0.12404039  0.09195729
+  1     1e-03  0.12851865  0.09596408
+  1     1e-02  0.11399831  0.08006290
+  1     1e-01  0.12528289  0.09202015
+  3     0e+00  0.30986443  0.28618781
+  3     1e-04  0.32893886  0.30600317
+  3     1e-03  0.33080149  0.30802179
+  3     1e-02  0.30494897  0.28166651
+  3     1e-01  0.34100902  0.31826493
+  5     0e+00  0.36521188  0.34465132
+  5     1e-04  0.38873731  0.36918065
+  5     1e-03  0.38362375  0.36384814
+  5     1e-02  0.35470308  0.33350356
+  5     1e-01  0.35563700  0.33427828
+  7     0e+00  0.34030936  0.31874033
+  7     1e-04  0.35599929  0.33509891
+  7     1e-03  0.35470206  0.33485549
+  7     1e-02  0.36883566  0.34837579
+  7     1e-01  0.33393575  0.31185770
+  9     0e+00  0.10928806  0.08004967
+  9     1e-04  0.18133828  0.15604262
+  9     1e-03  0.09830218  0.07156932
+  9     1e-02  0.10457983  0.07684305
+  9     1e-01  0.13853617  0.10978263
+
+Accuracy was used to select the optimal model using the largest value.
+The final values used for the model were size = 5 and decay = 1e-04.
+> 
+
+> ## 4. Treinamento do Random Forest (Baseline)
+
+set.seed(123)
+> modelo_rf <- train(FloodProbability ~ .,
+                   data = train_data,
+                   method = "rf",
+                   trControl = ctrl,
+                  #  metric = "ROC",
+                   tuneLength = 3)
+Houve 13 avisos (use warnings() para vê-los)
+> warnings()
+Mensagens de aviso:
+1: model fit failed for Fold2: mtry= 2 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+2: model fit failed for Fold2: mtry=11 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+3: model fit failed for Fold2: mtry=20 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+4: model fit failed for Fold3: mtry= 2 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+5: model fit failed for Fold3: mtry=11 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+6: model fit failed for Fold3: mtry=20 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+7: model fit failed for Fold4: mtry= 2 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+8: model fit failed for Fold4: mtry=11 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+9: model fit failed for Fold4: mtry=20 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+10: model fit failed for Fold5: mtry= 2 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+11: model fit failed for Fold5: mtry=11 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+12: model fit failed for Fold5: mtry=20 Error in randomForest.default(x, y, mtry = param$mtry, ...) : 
+  Can't have empty classes in y.
+
+13: In nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo,  ... :
+  There were missing values in resampled performance measures.
+> 
+> print(modelo_rf)
+Random Forest 
+
+35042 samples
+   20 predictor
+   83 classes: '0.285', '0.315', '0.32', '0.325', '0.33', '0.335', '0.34', '0.345', '0.35', '0.355', '0.36', '0.365', '0.37', '0.375', '0.38', '0.385', '0.39', '0.395', '0.4', '0.405', '0.41', '0.415', '0.42', '0.425', '0.43', '0.435', '0.44', '0.445', '0.45', '0.455', '0.46', '0.465', '0.47', '0.475', '0.48', '0.485', '0.49', '0.495', '0.5', '0.505', '0.51', '0.515', '0.52', '0.525', '0.53', '0.535', '0.54', '0.545', '0.55', '0.555', '0.56', '0.565', '0.57', '0.575', '0.58', '0.585', '0.59', '0.595', '0.6', '0.605', '0.61', '0.615', '0.62', '0.625', '0.63', '0.635', '0.64', '0.645', '0.65', '0.655', '0.66', '0.665', '0.67', '0.675', '0.68', '0.685', '0.69', '0.695', '0.7', '0.705', '0.71', '0.715', '0.725' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 28034, 28036, 28033, 28036, 28029 
+Resampling results across tuning parameters:
+
+  mtry  Accuracy    Kappa     
+   2    0.05821918  0.02434974
+  11    0.05679224  0.02331087
+  20    0.06164384  0.02833409
+
+Accuracy was used to select the optimal model using the largest value.
+The final value used for the model was mtry = 20.
+
+> ## 5. Avaliação dos Modelos
+
+# Previsões RNA e RF
+pred_rna <- predict(modelo_rna, newdata = test_data)
+> pred_rf <- predict(modelo_rf, newdata = test_data)
+
+> # Matrizes de confusão
+conf_rna <- confusionMatrix(pred_rna, test_data$FloodProbability)
+> conf_rf <- confusionMatrix(pred_rf, test_data$FloodProbability)
+> print(conf_rna)
+Confusion Matrix and Statistics
+
+          Reference
+Prediction 0.285 0.315 0.32 0.325 0.33 0.335 0.34 0.345 0.35 0.355 0.36 0.365
+     0.285     0     0    0     0    0     0    0     0    0     0    0     0
+     0.315     0     0    0     0    0     0    0     0    0     0    0     0
+     0.32      0     0    0     0    0     0    0     0    0     0    0     0
+     0.325     0     0    0     0    0     0    0     0    0     0    0     0
+     0.33      0     0    0     0    0     0    0     0    0     0    0     0
+     0.335     0     0    0     0    0     0    0     0    0     0    0     0
+     0.34      0     0    0     0    0     0    0     0    0     0    0     0
+     0.345     0     0    0     0    0     0    0     0    0     0    0     0
+     0.35      0     0    0     0    0     0    0     0    0     0    0     0
+     0.355     0     0    0     0    0     0    0     0    0     0    0     0
+     0.36      0     0    0     0    0     0    0     0    0     0    0     0
+     0.365     0     0    0     0    0     0    0     0    0     0    0     0
+     0.37      0     0    0     0    0     0    0     0    0     0    0     0
+     0.375     0     0    0     0    0     0    0     0    0     0    0     0
+     0.38      0     0    0     0    0     0    0     0    0     0    0     0
+     0.385     0     0    0     0    0     0    0     0    0     0    0     0
+     0.39      0     0    0     0    0     0    0     0    0     0    0     0
+     0.395     0     0    0     0    0     0    0     0    0     0    0     0
+     0.4       0     0    0     0    0     0    0     0    0     0    0     0
+     0.405     0     0    0     0    0     0    0     0    0     0    0     0
+     0.41      0     0    0     0    0     0    0     0    0     0    0     0
+     0.415     0     0    0     0    0     0    0     0    0     0    0     0
+     0.42      0     0    0     0    0     0    0     0    0     0    0     0
+     0.425     0     0    0     0    0     0    0     0    0     0    0     0
+     0.43      0     0    0     0    0     0    0     0    0     0    0     0
+     0.435     0     0    0     0    0     0    2     3    6     5    8    13
+     0.44      0     0    0     0    0     0    0     0    0     0    0     0
+     0.445     0     0    0     0    0     0    0     0    0     0    0     0
+     0.45      0     0    0     0    0     0    0     0    0     0    0     0
+     0.455     0     0    0     0    0     0    0     0    0     0    0     0
+     0.46      0     0    0     0    0     0    0     0    0     0    0     0
+     0.465     0     0    0     0    0     0    0     0    0     0    0     0
+     0.47      0     0    0     0    0     0    0     0    0     0    0     0
+     0.475     0     0    0     0    0     0    0     0    0     0    0     0
+     0.48      0     0    0     0    0     0    0     0    0     0    0     0
+     0.485     0     0    0     0    0     0    0     0    0     0    0     0
+     0.49      0     0    0     0    0     0    0     0    0     0    0     0
+     0.495     0     0    0     0    0     0    0     0    0     0    0     0
+     0.5       0     0    0     0    0     0    0     0    0     0    0     0
+     0.505     0     0    0     0    0     0    0     0    0     0    0     0
+     0.51      0     0    0     0    0     0    0     0    0     0    0     0
+     0.515     0     0    0     0    0     0    0     0    0     0    0     0
+     0.52      0     0    0     0    0     0    0     0    0     0    0     0
+     0.525     0     0    0     0    0     0    0     0    0     0    0     0
+     0.53      0     0    0     0    0     0    0     0    0     0    0     0
+     0.535     0     0    0     0    0     0    0     0    0     0    0     0
+     0.54      0     0    0     0    0     0    0     0    0     0    0     0
+     0.545     0     0    0     0    0     0    0     0    0     0    0     0
+     0.55      0     0    0     0    0     0    0     0    0     0    0     0
+     0.555     0     0    0     0    0     0    0     0    0     0    0     0
+     0.56      0     0    0     0    0     0    0     0    0     0    0     0
+     0.565     0     0    0     0    0     0    0     0    0     0    0     0
+     0.57      0     0    0     0    0     0    0     0    0     0    0     0
+     0.575     0     0    0     0    0     0    0     0    0     0    0     0
+     0.58      0     0    0     0    0     0    0     0    0     0    0     0
+     0.585     0     0    0     0    0     0    0     0    0     0    0     0
+     0.59      0     0    0     0    0     0    0     0    0     0    0     0
+     0.595     0     0    0     0    0     0    0     0    0     0    0     0
+     0.6       0     0    0     0    0     0    0     0    0     0    0     0
+     0.605     0     0    0     0    0     0    0     0    0     0    0     0
+     0.61      0     0    0     0    0     0    0     0    0     0    0     0
+     0.615     0     0    0     0    0     0    0     0    0     0    0     0
+     0.62      0     0    0     0    0     0    0     0    0     0    0     0
+     0.625     0     0    0     0    0     0    0     0    0     0    0     0
+     0.63      0     0    0     0    0     0    0     0    0     0    0     0
+     0.635     0     0    0     0    0     0    0     0    0     0    0     0
+     0.64      0     0    0     0    0     0    0     0    0     0    0     0
+     0.645     0     0    0     0    0     0    0     0    0     0    0     0
+     0.65      0     0    0     0    0     0    0     0    0     0    0     0
+     0.655     0     0    0     0    0     0    0     0    0     0    0     0
+     0.66      0     0    0     0    0     0    0     0    0     0    0     0
+     0.665     0     0    0     0    0     0    0     0    0     0    0     0
+     0.67      0     0    0     0    0     0    0     0    0     0    0     0
+     0.675     0     0    0     0    0     0    0     0    0     0    0     0
+     0.68      0     0    0     0    0     0    0     0    0     0    0     0
+     0.685     0     0    0     0    0     0    0     0    0     0    0     0
+     0.69      0     0    0     0    0     0    0     0    0     0    0     0
+     0.695     0     0    0     0    0     0    0     0    0     0    0     0
+     0.7       0     0    0     0    0     0    0     0    0     0    0     0
+     0.705     0     0    0     0    0     0    0     0    0     0    0     0
+     0.71      0     0    0     0    0     0    0     0    0     0    0     0
+     0.715     0     0    0     0    0     0    0     0    0     0    0     0
+     0.725     0     0    0     0    0     0    0     0    0     0    0     0
+          Reference
+Prediction 0.37 0.375 0.38 0.385 0.39 0.395 0.4 0.405 0.41 0.415 0.42 0.425
+     0.285    0     0    0     0    0     0   0     0    0     0    0     0
+     0.315    0     0    0     0    0     0   0     0    0     0    0     0
+     0.32     0     0    0     0    0     0   0     0    0     0    0     0
+     0.325    0     0    0     0    0     0   0     0    0     0    0     0
+     0.33     0     0    0     0    0     0   0     0    0     0    0     0
+     0.335    0     0    0     0    0     0   0     0    0     0    0     0
+     0.34     0     0    0     0    0     0   0     0    0     0    0     0
+     0.345    0     0    0     0    0     0   0     0    0     0    0     0
+     0.35     0     0    0     0    0     0   0     0    0     0    0     0
+     0.355    0     0    0     0    0     0   0     0    0     0    0     0
+     0.36     0     0    0     0    0     0   0     0    0     0    0     0
+     0.365    0     0    0     0    0     0   0     0    0     0    0     0
+     0.37     0     0    0     0    0     0   0     0    0     0    0     0
+     0.375    0     0    0     0    0     0   0     0    0     0    0     0
+     0.38     0     0    0     0    0     0   0     0    0     0    0     0
+     0.385    0     0    0     0    0     0   0     0    0     0    0     0
+     0.39     0     0    0     0    0     0   0     0    0     0    0     0
+     0.395    0     0    0     0    0     0   0     0    0     0    0     0
+     0.4      0     0    0     0    0     0   0     0    0     0    0     0
+     0.405    0     0    0     0    0     0   0     0    0     0    0     0
+     0.41     0     0    0     0    0     0   0     0    0     0    0     0
+     0.415    0     0    0     0    0     0   0     0    0     0    0     0
+     0.42     0     0    0     0    0     0   0     0    0     0    0     0
+     0.425    0     0    0     0    0     0   0     0    0     0    0     0
+     0.43     0     0    0     0    0     0   0     0    0     0    0     0
+     0.435   21    24   27    35   45    60  81   108  127    93    0     0
+     0.44     0     0    0     0    0     0   0     0    0    48  176   195
+     0.445    0     0    0     0    0     0   0     0    0     0    0     0
+     0.45     0     0    0     0    0     0   0     0    0     0    0     0
+     0.455    0     0    0     0    0     0   0     0    0     0    0     0
+     0.46     0     0    0     0    0     0   0     0    0     0    0     0
+     0.465    0     0    0     0    0     0   0     0    0     0    0     0
+     0.47     0     0    0     0    0     0   0     0    0     0    0     0
+     0.475    0     0    0     0    0     0   0     0    0     0    0     0
+     0.48     0     0    0     0    0     0   0     0    0     0    0     0
+     0.485    0     0    0     0    0     0   0     0    0     0    0     0
+     0.49     0     0    0     0    0     0   0     0    0     0    0     0
+     0.495    0     0    0     0    0     0   0     0    0     0    0     0
+     0.5      0     0    0     0    0     0   0     0    0     0    0     0
+     0.505    0     0    0     0    0     0   0     0    0     0    0     0
+     0.51     0     0    0     0    0     0   0     0    0     0    0     0
+     0.515    0     0    0     0    0     0   0     0    0     0    0     0
+     0.52     0     0    0     0    0     0   0     0    0     0    0     0
+     0.525    0     0    0     0    0     0   0     0    0     0    0     0
+     0.53     0     0    0     0    0     0   0     0    0     0    0     0
+     0.535    0     0    0     0    0     0   0     0    0     0    0     0
+     0.54     0     0    0     0    0     0   0     0    0     0    0     0
+     0.545    0     0    0     0    0     0   0     0    0     0    0     0
+     0.55     0     0    0     0    0     0   0     0    0     0    0     0
+     0.555    0     0    0     0    0     0   0     0    0     0    0     0
+     0.56     0     0    0     0    0     0   0     0    0     0    0     0
+     0.565    0     0    0     0    0     0   0     0    0     0    0     0
+     0.57     0     0    0     0    0     0   0     0    0     0    0     0
+     0.575    0     0    0     0    0     0   0     0    0     0    0     0
+     0.58     0     0    0     0    0     0   0     0    0     0    0     0
+     0.585    0     0    0     0    0     0   0     0    0     0    0     0
+     0.59     0     0    0     0    0     0   0     0    0     0    0     0
+     0.595    0     0    0     0    0     0   0     0    0     0    0     0
+     0.6      0     0    0     0    0     0   0     0    0     0    0     0
+     0.605    0     0    0     0    0     0   0     0    0     0    0     0
+     0.61     0     0    0     0    0     0   0     0    0     0    0     0
+     0.615    0     0    0     0    0     0   0     0    0     0    0     0
+     0.62     0     0    0     0    0     0   0     0    0     0    0     0
+     0.625    0     0    0     0    0     0   0     0    0     0    0     0
+     0.63     0     0    0     0    0     0   0     0    0     0    0     0
+     0.635    0     0    0     0    0     0   0     0    0     0    0     0
+     0.64     0     0    0     0    0     0   0     0    0     0    0     0
+     0.645    0     0    0     0    0     0   0     0    0     0    0     0
+     0.65     0     0    0     0    0     0   0     0    0     0    0     0
+     0.655    0     0    0     0    0     0   0     0    0     0    0     0
+     0.66     0     0    0     0    0     0   0     0    0     0    0     0
+     0.665    0     0    0     0    0     0   0     0    0     0    0     0
+     0.67     0     0    0     0    0     0   0     0    0     0    0     0
+     0.675    0     0    0     0    0     0   0     0    0     0    0     0
+     0.68     0     0    0     0    0     0   0     0    0     0    0     0
+     0.685    0     0    0     0    0     0   0     0    0     0    0     0
+     0.69     0     0    0     0    0     0   0     0    0     0    0     0
+     0.695    0     0    0     0    0     0   0     0    0     0    0     0
+     0.7      0     0    0     0    0     0   0     0    0     0    0     0
+     0.705    0     0    0     0    0     0   0     0    0     0    0     0
+     0.71     0     0    0     0    0     0   0     0    0     0    0     0
+     0.715    0     0    0     0    0     0   0     0    0     0    0     0
+     0.725    0     0    0     0    0     0   0     0    0     0    0     0
+          Reference
+Prediction 0.43 0.435 0.44 0.445 0.45 0.455 0.46 0.465 0.47 0.475 0.48 0.485
+     0.285    0     0    0     0    0     0    0     0    0     0    0     0
+     0.315    0     0    0     0    0     0    0     0    0     0    0     0
+     0.32     0     0    0     0    0     0    0     0    0     0    0     0
+     0.325    0     0    0     0    0     0    0     0    0     0    0     0
+     0.33     0     0    0     0    0     0    0     0    0     0    0     0
+     0.335    0     0    0     0    0     0    0     0    0     0    0     0
+     0.34     0     0    0     0    0     0    0     0    0     0    0     0
+     0.345    0     0    0     0    0     0    0     0    0     0    0     0
+     0.35     0     0    0     0    0     0    0     0    0     0    0     0
+     0.355    0     0    0     0    0     0    0     0    0     0    0     0
+     0.36     0     0    0     0    0     0    0     0    0     0    0     0
+     0.365    0     0    0     0    0     0    0     0    0     0    0     0
+     0.37     0     0    0     0    0     0    0     0    0     0    0     0
+     0.375    0     0    0     0    0     0    0     0    0     0    0     0
+     0.38     0     0    0     0    0     0    0     0    0     0    0     0
+     0.385    0     0    0     0    0     0    0     0    0     0    0     0
+     0.39     0     0    0     0    0     0    0     0    0     0    0     0
+     0.395    0     0    0     0    0     0    0     0    0     0    0     0
+     0.4      0     0    0     0    0     0    0     0    0     0    0     0
+     0.405    0     0    0     0    0     0    0     0    0     0    0     0
+     0.41     0     0    0     0    0     0    0     0    0     0    0     0
+     0.415    0     0    0     0    0     0    0     0    0     0    0     0
+     0.42     0     0    0     0    0     0    0     0    0     0    0     0
+     0.425    0     0    0     0    0     0    0     0    0     0    0     0
+     0.43     0     0    0     0    0     0    0     0    0     0    0     0
+     0.435    0     0    0     0    0     0    0     0    0     0    0     0
+     0.44   219   269  298   274    1     0    0     0    0     0    0     0
+     0.445    0     0    0     0    0     0    0     0    0     0    0     0
+     0.45     0     0    0     0    0     0    0     0    0     0    0     0
+     0.455    0     0    0     0    0     0    0     0    0     0    0     0
+     0.46     0     0    0    52  380   410   12     0    0     0    0     0
+     0.465    0     0    0     0    0    10  450   466  281     0    0     0
+     0.47     0     0    0     0    0     0    0     0    0     0    0     0
+     0.475    0     0    0     0    0     0    0     0  242   177    0     0
+     0.48     0     0    0     0    0     0    0     0    0   371  563     2
+     0.485    0     0    0     0    0     0    0     0    0     0    0   585
+     0.49     0     0    0     0    0     0    0     0    0     0    0     1
+     0.495    0     0    0     0    0     0    0     0    0     0    0     0
+     0.5      0     0    0     0    0     0    0     0    0     0    0     0
+     0.505    0     0    0     0    0     0    0     0    0     0    0     0
+     0.51     0     0    0     0    0     0    0     0    0     0    0     0
+     0.515    0     0    0     0    0     0    0     0    0     0    0     0
+     0.52     0     0    0     0    0     0    0     0    0     0    0     0
+     0.525    0     0    0     0    0     0    0     0    0     0    0     0
+     0.53     0     0    0     0    0     0    0     0    0     0    0     0
+     0.535    0     0    0     0    0     0    0     0    0     0    0     0
+     0.54     0     0    0     0    0     0    0     0    0     0    0     0
+     0.545    0     0    0     0    0     0    0     0    0     0    0     0
+     0.55     0     0    0     0    0     0    0     0    0     0    0     0
+     0.555    0     0    0     0    0     0    0     0    0     0    0     0
+     0.56     0     0    0     0    0     0    0     0    0     0    0     0
+     0.565    0     0    0     0    0     0    0     0    0     0    0     0
+     0.57     0     0    0     0    0     0    0     0    0     0    0     0
+     0.575    0     0    0     0    0     0    0     0    0     0    0     0
+     0.58     0     0    0     0    0     0    0     0    0     0    0     0
+     0.585    0     0    0     0    0     0    0     0    0     0    0     0
+     0.59     0     0    0     0    0     0    0     0    0     0    0     0
+     0.595    0     0    0     0    0     0    0     0    0     0    0     0
+     0.6      0     0    0     0    0     0    0     0    0     0    0     0
+     0.605    0     0    0     0    0     0    0     0    0     0    0     0
+     0.61     0     0    0     0    0     0    0     0    0     0    0     0
+     0.615    0     0    0     0    0     0    0     0    0     0    0     0
+     0.62     0     0    0     0    0     0    0     0    0     0    0     0
+     0.625    0     0    0     0    0     0    0     0    0     0    0     0
+     0.63     0     0    0     0    0     0    0     0    0     0    0     0
+     0.635    0     0    0     0    0     0    0     0    0     0    0     0
+     0.64     0     0    0     0    0     0    0     0    0     0    0     0
+     0.645    0     0    0     0    0     0    0     0    0     0    0     0
+     0.65     0     0    0     0    0     0    0     0    0     0    0     0
+     0.655    0     0    0     0    0     0    0     0    0     0    0     0
+     0.66     0     0    0     0    0     0    0     0    0     0    0     0
+     0.665    0     0    0     0    0     0    0     0    0     0    0     0
+     0.67     0     0    0     0    0     0    0     0    0     0    0     0
+     0.675    0     0    0     0    0     0    0     0    0     0    0     0
+     0.68     0     0    0     0    0     0    0     0    0     0    0     0
+     0.685    0     0    0     0    0     0    0     0    0     0    0     0
+     0.69     0     0    0     0    0     0    0     0    0     0    0     0
+     0.695    0     0    0     0    0     0    0     0    0     0    0     0
+     0.7      0     0    0     0    0     0    0     0    0     0    0     0
+     0.705    0     0    0     0    0     0    0     0    0     0    0     0
+     0.71     0     0    0     0    0     0    0     0    0     0    0     0
+     0.715    0     0    0     0    0     0    0     0    0     0    0     0
+     0.725    0     0    0     0    0     0    0     0    0     0    0     0
+          Reference
+Prediction 0.49 0.495 0.5 0.505 0.51 0.515 0.52 0.525 0.53 0.535 0.54 0.545
+     0.285    0     0   0     0    0     0    0     0    0     0    0     0
+     0.315    0     0   0     0    0     0    0     0    0     0    0     0
+     0.32     0     0   0     0    0     0    0     0    0     0    0     0
+     0.325    0     0   0     0    0     0    0     0    0     0    0     0
+     0.33     0     0   0     0    0     0    0     0    0     0    0     0
+     0.335    0     0   0     0    0     0    0     0    0     0    0     0
+     0.34     0     0   0     0    0     0    0     0    0     0    0     0
+     0.345    0     0   0     0    0     0    0     0    0     0    0     0
+     0.35     0     0   0     0    0     0    0     0    0     0    0     0
+     0.355    0     0   0     0    0     0    0     0    0     0    0     0
+     0.36     0     0   0     0    0     0    0     0    0     0    0     0
+     0.365    0     0   0     0    0     0    0     0    0     0    0     0
+     0.37     0     0   0     0    0     0    0     0    0     0    0     0
+     0.375    0     0   0     0    0     0    0     0    0     0    0     0
+     0.38     0     0   0     0    0     0    0     0    0     0    0     0
+     0.385    0     0   0     0    0     0    0     0    0     0    0     0
+     0.39     0     0   0     0    0     0    0     0    0     0    0     0
+     0.395    0     0   0     0    0     0    0     0    0     0    0     0
+     0.4      0     0   0     0    0     0    0     0    0     0    0     0
+     0.405    0     0   0     0    0     0    0     0    0     0    0     0
+     0.41     0     0   0     0    0     0    0     0    0     0    0     0
+     0.415    0     0   0     0    0     0    0     0    0     0    0     0
+     0.42     0     0   0     0    0     0    0     0    0     0    0     0
+     0.425    0     0   0     0    0     0    0     0    0     0    0     0
+     0.43     0     0   0     0    0     0    0     0    0     0    0     0
+     0.435    0     0   0     0    0     0    0     0    0     0    0     0
+     0.44     0     0   0     0    0     0    0     0    0     0    0     0
+     0.445    0     0   0     0    0     0    0     0    0     0    0     0
+     0.45     0     0   0     0    0     0    0     0    0     0    0     0
+     0.455    0     0   0     0    0     0    0     0    0     0    0     0
+     0.46     0     0   0     0    0     0    0     0    0     0    0     0
+     0.465    0     0   0     0    0     0    0     0    0     0    0     0
+     0.47     0     0   0     0    0     0    0     0    0     0    0     0
+     0.475    0     0   0     0    0     0    0     0    0     0    0     0
+     0.48     0     0   0     0    0     0    0     0    0     0    0     0
+     0.485    1     0   0     0    0     0    0     0    0     0    0     0
+     0.49   586     0   0     0    0     0    0     0    0     0    0     0
+     0.495    8   565  18     0    0     0    0     0    0     0    0     0
+     0.5      0    27 586   103    0     0    0     0    0     0    0     0
+     0.505    0     0   1   474   39     0    0     0    0     0    0     0
+     0.51     0     0   0     6  482     2    0     0    0     0    0     0
+     0.515    0     0   0     0   36   271    0     0    0     0    0     0
+     0.52     0     0   0     0    0   285  525     1    0     0    0     0
+     0.525    0     0   0     0    0     0   21   488    6     0    0     0
+     0.53     0     0   0     0    0     0    0     0  484     1    0     0
+     0.535    0     0   0     0    0     0    0     0    0   476   68     0
+     0.54     0     0   0     0    0     0    0     0    0     0    0     0
+     0.545    0     0   0     0    0     0    0     0    0     0    0     0
+     0.55     0     0   0     0    0     0    0     0    0     0    0     0
+     0.555    0     0   0     0    0     0    0     0    0     0  378   387
+     0.56     0     0   0     0    0     0    0     0    0     0    0     0
+     0.565    0     0   0     0    0     0    0     0    0     0    0     0
+     0.57     0     0   0     0    0     0    0     0    0     0    0     0
+     0.575    0     0   0     0    0     0    0     0    0     0    0     0
+     0.58     0     0   0     0    0     0    0     0    0     0    0     0
+     0.585    0     0   0     0    0     0    0     0    0     0    0     0
+     0.59     0     0   0     0    0     0    0     0    0     0    0     0
+     0.595    0     0   0     0    0     0    0     0    0     0    0     0
+     0.6      0     0   0     0    0     0    0     0    0     0    0     0
+     0.605    0     0   0     0    0     0    0     0    0     0    0     0
+     0.61     0     0   0     0    0     0    0     0    0     0    0     0
+     0.615    0     0   0     0    0     0    0     0    0     0    0     0
+     0.62     0     0   0     0    0     0    0     0    0     0    0     0
+     0.625    0     0   0     0    0     0    0     0    0     0    0     0
+     0.63     0     0   0     0    0     0    0     0    0     0    0     0
+     0.635    0     0   0     0    0     0    0     0    0     0    0     0
+     0.64     0     0   0     0    0     0    0     0    0     0    0     0
+     0.645    0     0   0     0    0     0    0     0    0     0    0     0
+     0.65     0     0   0     0    0     0    0     0    0     0    0     0
+     0.655    0     0   0     0    0     0    0     0    0     0    0     0
+     0.66     0     0   0     0    0     0    0     0    0     0    0     0
+     0.665    0     0   0     0    0     0    0     0    0     0    0     0
+     0.67     0     0   0     0    0     0    0     0    0     0    0     0
+     0.675    0     0   0     0    0     0    0     0    0     0    0     0
+     0.68     0     0   0     0    0     0    0     0    0     0    0     0
+     0.685    0     0   0     0    0     0    0     0    0     0    0     0
+     0.69     0     0   0     0    0     0    0     0    0     0    0     0
+     0.695    0     0   0     0    0     0    0     0    0     0    0     0
+     0.7      0     0   0     0    0     0    0     0    0     0    0     0
+     0.705    0     0   0     0    0     0    0     0    0     0    0     0
+     0.71     0     0   0     0    0     0    0     0    0     0    0     0
+     0.715    0     0   0     0    0     0    0     0    0     0    0     0
+     0.725    0     0   0     0    0     0    0     0    0     0    0     0
+          Reference
+Prediction 0.55 0.555 0.56 0.565 0.57 0.575 0.58 0.585 0.59 0.595 0.6 0.605
+     0.285    0     0    0     0    0     0    0     0    0     0   0     0
+     0.315    0     0    0     0    0     0    0     0    0     0   0     0
+     0.32     0     0    0     0    0     0    0     0    0     0   0     0
+     0.325    0     0    0     0    0     0    0     0    0     0   0     0
+     0.33     0     0    0     0    0     0    0     0    0     0   0     0
+     0.335    0     0    0     0    0     0    0     0    0     0   0     0
+     0.34     0     0    0     0    0     0    0     0    0     0   0     0
+     0.345    0     0    0     0    0     0    0     0    0     0   0     0
+     0.35     0     0    0     0    0     0    0     0    0     0   0     0
+     0.355    0     0    0     0    0     0    0     0    0     0   0     0
+     0.36     0     0    0     0    0     0    0     0    0     0   0     0
+     0.365    0     0    0     0    0     0    0     0    0     0   0     0
+     0.37     0     0    0     0    0     0    0     0    0     0   0     0
+     0.375    0     0    0     0    0     0    0     0    0     0   0     0
+     0.38     0     0    0     0    0     0    0     0    0     0   0     0
+     0.385    0     0    0     0    0     0    0     0    0     0   0     0
+     0.39     0     0    0     0    0     0    0     0    0     0   0     0
+     0.395    0     0    0     0    0     0    0     0    0     0   0     0
+     0.4      0     0    0     0    0     0    0     0    0     0   0     0
+     0.405    0     0    0     0    0     0    0     0    0     0   0     0
+     0.41     0     0    0     0    0     0    0     0    0     0   0     0
+     0.415    0     0    0     0    0     0    0     0    0     0   0     0
+     0.42     0     0    0     0    0     0    0     0    0     0   0     0
+     0.425    0     0    0     0    0     0    0     0    0     0   0     0
+     0.43     0     0    0     0    0     0    0     0    0     0   0     0
+     0.435    0     0    0     0    0     0    0     0    0     0   0     0
+     0.44     0     0    0     0    0     0    0     0    0     0   0     0
+     0.445    0     0    0     0    0     0    0     0    0     0   0     0
+     0.45     0     0    0     0    0     0    0     0    0     0   0     0
+     0.455    0     0    0     0    0     0    0     0    0     0   0     0
+     0.46     0     0    0     0    0     0    0     0    0     0   0     0
+     0.465    0     0    0     0    0     0    0     0    0     0   0     0
+     0.47     0     0    0     0    0     0    0     0    0     0   0     0
+     0.475    0     0    0     0    0     0    0     0    0     0   0     0
+     0.48     0     0    0     0    0     0    0     0    0     0   0     0
+     0.485    0     0    0     0    0     0    0     0    0     0   0     0
+     0.49     0     0    0     0    0     0    0     0    0     0   0     0
+     0.495    0     0    0     0    0     0    0     0    0     0   0     0
+     0.5      0     0    0     0    0     0    0     0    0     0   0     0
+     0.505    0     0    0     0    0     0    0     0    0     0   0     0
+     0.51     0     0    0     0    0     0    0     0    0     0   0     0
+     0.515    0     0    0     0    0     0    0     0    0     0   0     0
+     0.52     0     0    0     0    0     0    0     0    0     0   0     0
+     0.525    0     0    0     0    0     0    0     0    0     0   0     0
+     0.53     0     0    0     0    0     0    0     0    0     0   0     0
+     0.535    0     0    0     0    0     0    0     0    0     0   0     0
+     0.54     0     0    0     0    0     0    0     0    0     0   0     0
+     0.545    0     0    0     0    0     0    0     0    0     0   0     0
+     0.55     0     0    0     0    0     0    0     0    0     0   0     0
+     0.555  344   315  265   245  217   184  162   135  114   107  77    73
+     0.56     0     0    0     0    0     0    0     0    0     0   0     0
+     0.565    0     0    0     0    0     0    0     0    0     0   0     0
+     0.57     0     0    0     0    0     0    0     0    0     0   0     0
+     0.575    0     0    0     0    0     0    0     0    0     0   0     0
+     0.58     0     0    0     0    0     0    0     0    0     0   0     0
+     0.585    0     0    0     0    0     0    0     0    0     0   0     0
+     0.59     0     0    0     0    0     0    0     0    0     0   0     0
+     0.595    0     0    0     0    0     0    0     0    0     0   0     0
+     0.6      0     0    0     0    0     0    0     0    0     0   0     0
+     0.605    0     0    0     0    0     0    0     0    0     0   0     0
+     0.61     0     0    0     0    0     0    0     0    0     0   0     0
+     0.615    0     0    0     0    0     0    0     0    0     0   0     0
+     0.62     0     0    0     0    0     0    0     0    0     0   0     0
+     0.625    0     0    0     0    0     0    0     0    0     0   0     0
+     0.63     0     0    0     0    0     0    0     0    0     0   0     0
+     0.635    0     0    0     0    0     0    0     0    0     0   0     0
+     0.64     0     0    0     0    0     0    0     0    0     0   0     0
+     0.645    0     0    0     0    0     0    0     0    0     0   0     0
+     0.65     0     0    0     0    0     0    0     0    0     0   0     0
+     0.655    0     0    0     0    0     0    0     0    0     0   0     0
+     0.66     0     0    0     0    0     0    0     0    0     0   0     0
+     0.665    0     0    0     0    0     0    0     0    0     0   0     0
+     0.67     0     0    0     0    0     0    0     0    0     0   0     0
+     0.675    0     0    0     0    0     0    0     0    0     0   0     0
+     0.68     0     0    0     0    0     0    0     0    0     0   0     0
+     0.685    0     0    0     0    0     0    0     0    0     0   0     0
+     0.69     0     0    0     0    0     0    0     0    0     0   0     0
+     0.695    0     0    0     0    0     0    0     0    0     0   0     0
+     0.7      0     0    0     0    0     0    0     0    0     0   0     0
+     0.705    0     0    0     0    0     0    0     0    0     0   0     0
+     0.71     0     0    0     0    0     0    0     0    0     0   0     0
+     0.715    0     0    0     0    0     0    0     0    0     0   0     0
+     0.725    0     0    0     0    0     0    0     0    0     0   0     0
+          Reference
+Prediction 0.61 0.615 0.62 0.625 0.63 0.635 0.64 0.645 0.65 0.655 0.66 0.665
+     0.285    0     0    0     0    0     0    0     0    0     0    0     0
+     0.315    0     0    0     0    0     0    0     0    0     0    0     0
+     0.32     0     0    0     0    0     0    0     0    0     0    0     0
+     0.325    0     0    0     0    0     0    0     0    0     0    0     0
+     0.33     0     0    0     0    0     0    0     0    0     0    0     0
+     0.335    0     0    0     0    0     0    0     0    0     0    0     0
+     0.34     0     0    0     0    0     0    0     0    0     0    0     0
+     0.345    0     0    0     0    0     0    0     0    0     0    0     0
+     0.35     0     0    0     0    0     0    0     0    0     0    0     0
+     0.355    0     0    0     0    0     0    0     0    0     0    0     0
+     0.36     0     0    0     0    0     0    0     0    0     0    0     0
+     0.365    0     0    0     0    0     0    0     0    0     0    0     0
+     0.37     0     0    0     0    0     0    0     0    0     0    0     0
+     0.375    0     0    0     0    0     0    0     0    0     0    0     0
+     0.38     0     0    0     0    0     0    0     0    0     0    0     0
+     0.385    0     0    0     0    0     0    0     0    0     0    0     0
+     0.39     0     0    0     0    0     0    0     0    0     0    0     0
+     0.395    0     0    0     0    0     0    0     0    0     0    0     0
+     0.4      0     0    0     0    0     0    0     0    0     0    0     0
+     0.405    0     0    0     0    0     0    0     0    0     0    0     0
+     0.41     0     0    0     0    0     0    0     0    0     0    0     0
+     0.415    0     0    0     0    0     0    0     0    0     0    0     0
+     0.42     0     0    0     0    0     0    0     0    0     0    0     0
+     0.425    0     0    0     0    0     0    0     0    0     0    0     0
+     0.43     0     0    0     0    0     0    0     0    0     0    0     0
+     0.435    0     0    0     0    0     0    0     0    0     0    0     0
+     0.44     0     0    0     0    0     0    0     0    0     0    0     0
+     0.445    0     0    0     0    0     0    0     0    0     0    0     0
+     0.45     0     0    0     0    0     0    0     0    0     0    0     0
+     0.455    0     0    0     0    0     0    0     0    0     0    0     0
+     0.46     0     0    0     0    0     0    0     0    0     0    0     0
+     0.465    0     0    0     0    0     0    0     0    0     0    0     0
+     0.47     0     0    0     0    0     0    0     0    0     0    0     0
+     0.475    0     0    0     0    0     0    0     0    0     0    0     0
+     0.48     0     0    0     0    0     0    0     0    0     0    0     0
+     0.485    0     0    0     0    0     0    0     0    0     0    0     0
+     0.49     0     0    0     0    0     0    0     0    0     0    0     0
+     0.495    0     0    0     0    0     0    0     0    0     0    0     0
+     0.5      0     0    0     0    0     0    0     0    0     0    0     0
+     0.505    0     0    0     0    0     0    0     0    0     0    0     0
+     0.51     0     0    0     0    0     0    0     0    0     0    0     0
+     0.515    0     0    0     0    0     0    0     0    0     0    0     0
+     0.52     0     0    0     0    0     0    0     0    0     0    0     0
+     0.525    0     0    0     0    0     0    0     0    0     0    0     0
+     0.53     0     0    0     0    0     0    0     0    0     0    0     0
+     0.535    0     0    0     0    0     0    0     0    0     0    0     0
+     0.54     0     0    0     0    0     0    0     0    0     0    0     0
+     0.545    0     0    0     0    0     0    0     0    0     0    0     0
+     0.55     0     0    0     0    0     0    0     0    0     0    0     0
+     0.555   57    45   37    26   24    17   13     9    8     7    5     4
+     0.56     0     0    0     0    0     0    0     0    0     0    0     0
+     0.565    0     0    0     0    0     0    0     0    0     0    0     0
+     0.57     0     0    0     0    0     0    0     0    0     0    0     0
+     0.575    0     0    0     0    0     0    0     0    0     0    0     0
+     0.58     0     0    0     0    0     0    0     0    0     0    0     0
+     0.585    0     0    0     0    0     0    0     0    0     0    0     0
+     0.59     0     0    0     0    0     0    0     0    0     0    0     0
+     0.595    0     0    0     0    0     0    0     0    0     0    0     0
+     0.6      0     0    0     0    0     0    0     0    0     0    0     0
+     0.605    0     0    0     0    0     0    0     0    0     0    0     0
+     0.61     0     0    0     0    0     0    0     0    0     0    0     0
+     0.615    0     0    0     0    0     0    0     0    0     0    0     0
+     0.62     0     0    0     0    0     0    0     0    0     0    0     0
+     0.625    0     0    0     0    0     0    0     0    0     0    0     0
+     0.63     0     0    0     0    0     0    0     0    0     0    0     0
+     0.635    0     0    0     0    0     0    0     0    0     0    0     0
+     0.64     0     0    0     0    0     0    0     0    0     0    0     0
+     0.645    0     0    0     0    0     0    0     0    0     0    0     0
+     0.65     0     0    0     0    0     0    0     0    0     0    0     0
+     0.655    0     0    0     0    0     0    0     0    0     0    0     0
+     0.66     0     0    0     0    0     0    0     0    0     0    0     0
+     0.665    0     0    0     0    0     0    0     0    0     0    0     0
+     0.67     0     0    0     0    0     0    0     0    0     0    0     0
+     0.675    0     0    0     0    0     0    0     0    0     0    0     0
+     0.68     0     0    0     0    0     0    0     0    0     0    0     0
+     0.685    0     0    0     0    0     0    0     0    0     0    0     0
+     0.69     0     0    0     0    0     0    0     0    0     0    0     0
+     0.695    0     0    0     0    0     0    0     0    0     0    0     0
+     0.7      0     0    0     0    0     0    0     0    0     0    0     0
+     0.705    0     0    0     0    0     0    0     0    0     0    0     0
+     0.71     0     0    0     0    0     0    0     0    0     0    0     0
+     0.715    0     0    0     0    0     0    0     0    0     0    0     0
+     0.725    0     0    0     0    0     0    0     0    0     0    0     0
+          Reference
+Prediction 0.67 0.675 0.68 0.685 0.69 0.695 0.7 0.705 0.71 0.715 0.725
+     0.285    0     0    0     0    0     0   0     0    0     0     0
+     0.315    0     0    0     0    0     0   0     0    0     0     0
+     0.32     0     0    0     0    0     0   0     0    0     0     0
+     0.325    0     0    0     0    0     0   0     0    0     0     0
+     0.33     0     0    0     0    0     0   0     0    0     0     0
+     0.335    0     0    0     0    0     0   0     0    0     0     0
+     0.34     0     0    0     0    0     0   0     0    0     0     0
+     0.345    0     0    0     0    0     0   0     0    0     0     0
+     0.35     0     0    0     0    0     0   0     0    0     0     0
+     0.355    0     0    0     0    0     0   0     0    0     0     0
+     0.36     0     0    0     0    0     0   0     0    0     0     0
+     0.365    0     0    0     0    0     0   0     0    0     0     0
+     0.37     0     0    0     0    0     0   0     0    0     0     0
+     0.375    0     0    0     0    0     0   0     0    0     0     0
+     0.38     0     0    0     0    0     0   0     0    0     0     0
+     0.385    0     0    0     0    0     0   0     0    0     0     0
+     0.39     0     0    0     0    0     0   0     0    0     0     0
+     0.395    0     0    0     0    0     0   0     0    0     0     0
+     0.4      0     0    0     0    0     0   0     0    0     0     0
+     0.405    0     0    0     0    0     0   0     0    0     0     0
+     0.41     0     0    0     0    0     0   0     0    0     0     0
+     0.415    0     0    0     0    0     0   0     0    0     0     0
+     0.42     0     0    0     0    0     0   0     0    0     0     0
+     0.425    0     0    0     0    0     0   0     0    0     0     0
+     0.43     0     0    0     0    0     0   0     0    0     0     0
+     0.435    0     0    0     0    0     0   0     0    0     0     0
+     0.44     0     0    0     0    0     0   0     0    0     0     0
+     0.445    0     0    0     0    0     0   0     0    0     0     0
+     0.45     0     0    0     0    0     0   0     0    0     0     0
+     0.455    0     0    0     0    0     0   0     0    0     0     0
+     0.46     0     0    0     0    0     0   0     0    0     0     0
+     0.465    0     0    0     0    0     0   0     0    0     0     0
+     0.47     0     0    0     0    0     0   0     0    0     0     0
+     0.475    0     0    0     0    0     0   0     0    0     0     0
+     0.48     0     0    0     0    0     0   0     0    0     0     0
+     0.485    0     0    0     0    0     0   0     0    0     0     0
+     0.49     0     0    0     0    0     0   0     0    0     0     0
+     0.495    0     0    0     0    0     0   0     0    0     0     0
+     0.5      0     0    0     0    0     0   0     0    0     0     0
+     0.505    0     0    0     0    0     0   0     0    0     0     0
+     0.51     0     0    0     0    0     0   0     0    0     0     0
+     0.515    0     0    0     0    0     0   0     0    0     0     0
+     0.52     0     0    0     0    0     0   0     0    0     0     0
+     0.525    0     0    0     0    0     0   0     0    0     0     0
+     0.53     0     0    0     0    0     0   0     0    0     0     0
+     0.535    0     0    0     0    0     0   0     0    0     0     0
+     0.54     0     0    0     0    0     0   0     0    0     0     0
+     0.545    0     0    0     0    0     0   0     0    0     0     0
+     0.55     0     0    0     0    0     0   0     0    0     0     0
+     0.555    1     2    0     0    0     0   0     0    0     0     0
+     0.56     0     0    0     0    0     0   0     0    0     0     0
+     0.565    0     0    0     0    0     0   0     0    0     0     0
+     0.57     0     0    0     0    0     0   0     0    0     0     0
+     0.575    0     0    0     0    0     0   0     0    0     0     0
+     0.58     0     0    0     0    0     0   0     0    0     0     0
+     0.585    0     0    0     0    0     0   0     0    0     0     0
+     0.59     0     0    0     0    0     0   0     0    0     0     0
+     0.595    0     0    0     0    0     0   0     0    0     0     0
+     0.6      0     0    0     0    0     0   0     0    0     0     0
+     0.605    0     0    0     0    0     0   0     0    0     0     0
+     0.61     0     0    0     0    0     0   0     0    0     0     0
+     0.615    0     0    0     0    0     0   0     0    0     0     0
+     0.62     0     0    0     0    0     0   0     0    0     0     0
+     0.625    0     0    0     0    0     0   0     0    0     0     0
+     0.63     0     0    0     0    0     0   0     0    0     0     0
+     0.635    0     0    0     0    0     0   0     0    0     0     0
+     0.64     0     0    0     0    0     0   0     0    0     0     0
+     0.645    0     0    0     0    0     0   0     0    0     0     0
+     0.65     0     0    0     0    0     0   0     0    0     0     0
+     0.655    0     0    0     0    0     0   0     0    0     0     0
+     0.66     0     0    0     0    0     0   0     0    0     0     0
+     0.665    0     0    0     0    0     0   0     0    0     0     0
+     0.67     0     0    0     0    0     0   0     0    0     0     0
+     0.675    0     0    0     0    0     0   0     0    0     0     0
+     0.68     0     0    0     0    0     0   0     0    0     0     0
+     0.685    0     0    0     0    0     0   0     0    0     0     0
+     0.69     0     0    0     0    0     0   0     0    0     0     0
+     0.695    0     0    0     0    0     0   0     0    0     0     0
+     0.7      0     0    0     0    0     0   0     0    0     0     0
+     0.705    0     0    0     0    0     0   0     0    0     0     0
+     0.71     0     0    0     0    0     0   0     0    0     0     0
+     0.715    0     0    0     0    0     0   0     0    0     0     0
+     0.725    0     0    0     0    0     0   0     0    0     0     0
+
+Overall Statistics
+                                          
+               Accuracy : 0.4916          
+                 95% CI : (0.4835, 0.4996)
+    No Information Rate : 0.0404          
+    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+                  Kappa : 0.4757          
+                                          
+ Mcnemar's Test P-Value : NA              
 
 Statistics by Class:
 
@@ -191,6 +1377,8 @@ Prevalence                     0            0            0
 Detection Rate                 0            0            0
 Detection Prevalence           0            0            0
 Balanced Accuracy             NA           NA           NA
+> 
+
 > print(conf_rf)
 Confusion Matrix and Statistics
 
@@ -215,18 +1403,18 @@ Prediction 0.285 0.315 0.32 0.325 0.33 0.335 0.34 0.345 0.35 0.355 0.36 0.365
      0.39      0     0    0     0    0     0    0     0    0     0    0     1
      0.395     0     0    0     0    0     0    0     0    0     0    0     0
      0.4       0     0    0     0    0     0    0     0    0     0    1     1
-     0.405     0     0    0     0    0     0    0     0    0     0    0     1
+     0.405     0     0    0     0    0     0    0     0    0     1    0     1
      0.41      0     0    0     0    0     0    0     0    1     0    0     0
-     0.415     0     0    0     0    0     0    1     0    0     2    1     1
+     0.415     0     0    0     0    0     0    1     0    0     1    1     1
      0.42      0     0    0     0    0     0    0     0    0     0    1     1
      0.425     0     0    0     0    0     0    0     1    1     0    1     2
      0.43      0     0    0     0    0     0    0     1    1     1    0     1
      0.435     0     0    0     0    0     0    0     0    1     0    2     0
      0.44      0     0    0     0    0     0    1     0    1     0    0     2
-     0.445     0     0    0     0    0     0    0     0    0     0    0     0
+     0.445     0     0    0     0    0     0    0     0    0     0    0     1
      0.45      0     0    0     0    0     0    0     0    0     2    0     0
      0.455     0     0    0     0    0     0    0     0    0     0    1     1
-     0.46      0     0    0     0    0     0    0     0    0     0    1     1
+     0.46      0     0    0     0    0     0    0     0    0     0    1     0
      0.465     0     0    0     0    0     0    0     1    0     0    0     1
      0.47      0     0    0     0    0     0    0     0    0     0    0     0
      0.475     0     0    0     0    0     0    0     0    0     0    0     0
@@ -301,24 +1489,24 @@ Prediction 0.37 0.375 0.38 0.385 0.39 0.395 0.4 0.405 0.41 0.415 0.42 0.425
      0.395    0     0    0     1    0     0   0     0    0     0    0     0
      0.4      0     1    0     1    1     0   0     0    0     0    0     0
      0.405    0     1    1     0    0     2   0     0    0     0    0     0
-     0.41     0     1    2     0    0     0   0     0    2     0    0     0
-     0.415    0     1    0     0    0     1   2     2    3     0    0     2
-     0.42     2     3    0     1    1     3   5     3    0     1    3     2
-     0.425    1     2    3     4    5     2   1     4    6     3    0     3
-     0.43     2     1    5     2    1     0   5     5    3     5    2     3
-     0.435    4     3    2     9    1     8   8    13    9     9    7     3
-     0.44     3     0    4     6    5     9   8    14   10    12   14    15
-     0.445    1     3    1     0    6     4   7     4    8     8   10    15
-     0.45     2     5    4     3    9     7  16    14   16    17   20    21
-     0.455    6     1    2     3    8     8   8    10   10    19   18    25
-     0.46     0     2    0     2    3     8   6    12   16    11   24    28
-     0.465    0     0    1     0    2     2   9     8   11     9   10    18
-     0.47     0     0    1     1    3     1   1    12   11    13   22    14
-     0.475    0     0    0     0    0     2   1     3   15    17   13    19
-     0.48     0     0    1     1    0     2   1     0    2    11   14    11
-     0.485    0     0    0     0    0     1   1     3    2     5   13     5
-     0.49     0     0    0     1    0     0   2     0    1     0    4     5
-     0.495    0     0    0     0    0     0   0     1    1     0    0     4
+     0.41     0     1    2     0    0     0   0     0    3     0    0     0
+     0.415    0     1    0     0    0     1   2     2    3     1    0     2
+     0.42     2     3    0     1    1     3   5     3    1     1    3     2
+     0.425    1     1    3     4    4     2   1     4    7     2    0     3
+     0.43     2     2    5     2    3     0   5     5    3     5    2     3
+     0.435    4     3    2     8    1     8   8    14    9     9    7     3
+     0.44     3     0    3     6    5     9   8    15   10    11   15    14
+     0.445    1     3    2     0    5     4   7     4    8     8   10    15
+     0.45     2     5    4     3    9     7  16    14   15    18   19    21
+     0.455    6     1    2     3    7     8   8    10    9    18   19    25
+     0.46     0     2    0     3    3     8   5    11   14    11   24    27
+     0.465    0     0    1     0    2     2   9     8   12     9    9    18
+     0.47     0     0    1     1    3     1   1    11   12    14   23    15
+     0.475    0     0    0     0    1     2   2     3   14    17   13    19
+     0.48     0     0    1     1    0     2   1     0    2    11   14    12
+     0.485    0     0    0     0    0     1   1     3    2     5   12     5
+     0.49     0     0    0     1    0     0   2     0    1     0    4     6
+     0.495    0     0    0     0    0     0   0     1    1     0    0     3
      0.5      0     0    0     0    0     0   0     0    1     1    2     0
      0.505    0     0    0     0    0     0   0     0    0     0    0     1
      0.51     0     0    0     0    0     0   0     0    0     0    0     0
@@ -391,27 +1579,27 @@ Prediction 0.43 0.435 0.44 0.445 0.45 0.455 0.46 0.465 0.47 0.475 0.48 0.485
      0.42     0     2    2     0    1     0    0     0    1     1    0     0
      0.425    5     1    1     2    1     1    0     0    0     1    0     0
      0.43     6     3    6     3    2     2    1     0    1     0    0     1
-     0.435   10     9    6     6    4     9    2     1    0     1    0     0
-     0.44     9    11    6     9    3     7    4     2    3     1    2     2
-     0.445    4    13   11     7   15    11    7     6    3     1    3     1
-     0.45    29    21   18    26   23    25   17    14   16    19    4     4
-     0.455   22    27   38    26   26    26   28    27   12    23   15     8
-     0.46    27    23   34    26   26    41   36    42   30    30   23    17
-     0.465   12    37   19    33   43    26   39    28   32    24   29    23
-     0.47    30    40   39    41   43    40   64    39   46    40   46    34
-     0.475   20    29   39    40   51    45   53    50   64    65   48    53
-     0.48    18    16   19    29   39    52   44    48   66    62   47    55
-     0.485   11     4   20    27   34    32   40    48   58    62   78    74
-     0.49     9     9   19    18   28    31   44    48   56    62   81    67
-     0.495    4     5   10    12   16    27   36    38   50    42   50    63
-     0.5      2    11    6    12   13    21   22    33   35    45   43    61
-     0.505    1     3    2     4    7    10   10     9   18    26   42    37
-     0.51     0     2    2     1    2     4    5    16   10    15   15    23
-     0.515    0     3    0     3    2     6    6     8    7     9    9    17
-     0.52     0     0    0     0    1     0    3     5    5     8   18    22
-     0.525    0     0    0     0    0     2    1     1    2     7    3    14
-     0.53     0     0    0     0    0     1    0     1    3     1    4     3
-     0.535    0     0    0     0    0     1    0     1    3     3    1     8
+     0.435   10     9    4     6    4     9    2     1    0     2    0     1
+     0.44     9    11    7     9    3     5    3     2    3     0    2     2
+     0.445    4    13   14     7   15    13    7     6    3     1    3     1
+     0.45    29    23   17    24   21    22   17    14   17    19    4     4
+     0.455   23    29   40    24   24    25   29    29   14    22   17     8
+     0.46    25    25   35    29   26    42   36    43   30    29   25    20
+     0.465   12    38   17    31   43    27   39    27   34    22   28    23
+     0.47    31    39   36    41   45    42   66    40   43    40   45    34
+     0.475   20    27   39    40   50    45   51    49   61    66   48    50
+     0.48    18    15   22    30   41    51   46    47   65    62   45    56
+     0.485   12     2   19    29   35    30   39    50   58    65   74    74
+     0.49     8     9   19    18   28    31   44    47   55    62   82    67
+     0.495    4     5   11    13   15    31   38    38   50    43   50    60
+     0.5      2    11    4    10   14    21   20    31   35    43   40    60
+     0.505    1     2    2     5    7    10   10     9   19    27   45    38
+     0.51     0     2    2     2    2     4    5    16   11    15   16    26
+     0.515    0     3    0     2    2     5    6     8    7     8   12    15
+     0.52     0     0    0     0    1     0    2     5    6    10   17    22
+     0.525    0     0    0     0    0     2    1     1    2     7    4    14
+     0.53     0     0    0     0    0     1    0     1    3     1    3     3
+     0.535    0     0    0     0    0     1    0     1    3     2    1     8
      0.54     0     0    0     0    1     0    0     1    2     0    1     0
      0.545    0     0    0     0    0     0    0     0    0     0    1     1
      0.55     0     0    0     0    0     0    0     0    0     0    0     0
@@ -477,32 +1665,32 @@ Prediction 0.49 0.495 0.5 0.505 0.51 0.515 0.52 0.525 0.53 0.535 0.54 0.545
      0.425    0     0   0     0    0     0    0     0    0     0    0     0
      0.43     0     0   1     0    0     0    0     0    0     0    0     0
      0.435    0     1   0     0    0     0    0     0    0     0    0     0
-     0.44     1     0   0     0    0     0    0     0    0     0    0     0
-     0.445    1     0   1     0    0     2    0     0    0     0    0     0
-     0.45     5     2   2     0    1     1    0     0    0     0    0     0
-     0.455    7     2   5     2    1     2    1     1    1     0    0     0
-     0.46    16    11   6     7    3     4    2     0    1     1    0     0
-     0.465   15    15   6     8    6     6    4     0    0     3    0     0
-     0.47    26    21  18    15   13     9    6     4    5     0    0     0
-     0.475   45    39  32    31   28    16   12    11    8     7    4     1
-     0.48    62    62  44    31   26    30   18    14   11    11    6     4
-     0.485   67    54  69    53   42    29   28    18   15    17   15     6
-     0.49    79    66  72    49   35    45   48    31   32    18   23    15
-     0.495   63    69  60    58   64    64   40    33   39    36   26    22
-     0.5     60    56  69    71   75    62   64    49   43    42   28    26
-     0.505   39    44  65    60   63    57   64    42   46    38   42    43
-     0.51    27    36  29    39   49    35   44    36   41    34   34    30
-     0.515   30    35  41    53   42    42   62    59   52    59   36    42
-     0.52    22    39  31    33   35    46   51    48   59    53   56    33
-     0.525   15    21  16    19   13    35   23    40   25    37   31    36
-     0.53     4     6  13    25   23    20   26    34   36    31   35    32
-     0.535    8    11  14    10   18    26   31    32   27    49   54    40
-     0.54     3     2   8    12    9    12   10    16   19    21   24    27
-     0.545    0     0   3     3    8     5    5    12   14     8   14    14
-     0.55     0     0   0     1    2     4    4     4    8     5   12     7
-     0.555    0     0   0     2    1     4    2     1    3     2    2     5
-     0.56     0     0   0     0    0     1    1     2    2     3    2     0
-     0.565    0     0   0     1    0     0    0     0    2     2    2     3
+     0.44     2     0   0     0    0     0    0     0    0     0    0     0
+     0.445    1     0   1     0    0     1    0     0    0     0    0     0
+     0.45     4     2   2     0    1     1    0     0    0     0    0     0
+     0.455    6     2   5     2    1     2    1     1    1     0    0     0
+     0.46    18    10   6     7    3     4    2     0    1     1    0     0
+     0.465   16    15   5     7    7     6    4     0    0     4    0     0
+     0.47    24    21  18    15   13    10    7     4    4     1    0     0
+     0.475   40    41  32    29   30    16   11    12    7     7    5     1
+     0.48    62    63  44    31   25    30   18    15   11    10    5     5
+     0.485   68    56  71    55   40    31   27    20   15    16   15     5
+     0.49    78    66  70    46   32    45   49    32   32    18   23    13
+     0.495   65    67  65    57   64    65   39    34   40    34   24    21
+     0.5     61    58  68    75   75    58   63    48   44    40   29    24
+     0.505   41    41  64    58   61    57   63    42   47    41   39    43
+     0.51    28    34  27    40   48    41   47    35   39    36   36    32
+     0.515   30    37  40    52   43    43   63    58   53    57   37    42
+     0.52    22    39  32    34   38    47   52    46   60    54   57    34
+     0.525   14    18  16    19   14    31   24    38   27    36   32    40
+     0.53     4     7  14    26   24    19   26    32   36    31   35    31
+     0.535    8    12  13    11   18    23   30    36   26    48   54    40
+     0.54     3     2   8    13    9    13   10    15   17    21   24    29
+     0.545    0     0   3     2    7     6    5    11   14     8   14    14
+     0.55     0     0   0     1    2     3    3     5    8     6   12     7
+     0.555    0     0   0     2    1     4    1     1    3     3    2     3
+     0.56     0     0   0     0    1     1    1     2    2     3    2     0
+     0.565    0     0   0     1    0     0    0     0    2     2    1     2
      0.57     0     0   0     0    0     1    0     0    0     0    0     1
      0.575    0     0   0     0    0     0    0     2    1     0    0     0
      0.58     0     0   0     0    0     0    0     0    0     0    0     0
@@ -566,30 +1754,30 @@ Prediction 0.55 0.555 0.56 0.565 0.57 0.575 0.58 0.585 0.59 0.595 0.6 0.605
      0.445    0     0    0     0    0     0    0     0    0     0   0     0
      0.45     0     0    0     0    0     0    0     0    0     0   0     0
      0.455    0     0    0     0    0     0    0     0    0     0   0     0
-     0.46     0     0    0     0    0     0    0     0    0     0   0     0
+     0.46     0     0    1     0    0     0    0     0    0     0   0     0
      0.465    0     0    0     0    0     0    0     0    0     0   0     0
      0.47     0     0    0     0    0     0    0     0    0     0   0     0
-     0.475    4     0    0     0    0     0    0     0    0     0   0     0
-     0.48     3     3    1     0    1     0    0     0    0     0   0     0
-     0.485    5     2    4     1    1     1    1     0    0     0   0     0
-     0.49     5     4    6     3    2     0    1     0    0     0   0     0
-     0.495   10     7    6     2    4     4    2     1    0     0   0     0
-     0.5     22    16   13    10    5     2    2     1    1     1   0     1
-     0.505   15    19   14    11    9     4    3     2    2     0   0     1
-     0.51    27    21   19    11   16     9    7     3    1     2   1     2
-     0.515   30    33   25    27   18    14    7    13    6     5   4     3
-     0.52    45    36   26    28   26    26   18     9    8    11   5     2
-     0.525   25    32   29    21   21    11    9    15    8     7   1     3
-     0.53    38    40   30    28   19    25   24    20   12     6   2     7
-     0.535   44    39   29    31   28    31   14    21   15    16   8     9
-     0.54    31    27   24    26   19    25   29    12   22    16  13    12
-     0.545   12    11   21    12   14     9   19    13   11    11   6     3
-     0.55    10    13    9    18   13     4    8     9   13    11   8    10
-     0.555   13     5    7     6    9     9   10     6    3     6   9     8
-     0.56     3     3    2     3    5     2    2     3    4     5   6     3
-     0.565    1     1    0     1    1     2    3     2    2     8   5     3
-     0.57     1     2    0     3    0     4    1     3    4     0   6     1
-     0.575    0     1    0     3    2     1    1     1    1     0   1     1
+     0.475    3     0    0     0    0     0    0     0    0     0   0     0
+     0.48     2     3    0     0    0     0    0     0    0     0   0     0
+     0.485    5     2    4     1    1     0    1     0    0     0   0     0
+     0.49     5     4    5     3    3     0    1     0    0     0   0     0
+     0.495   10     8   10     2    5     4    2     1    0     0   0     0
+     0.5     22    16   11    11    5     2    2     1    1     1   0     1
+     0.505   17    19   13    12   10     4    4     2    2     0   1     1
+     0.51    25    17   17    11   17     9    6     3    1     2   1     2
+     0.515   29    36   26    26   19    15    8    12    6     5   4     3
+     0.52    42    38   25    29   24    27   19    10    8     9   6     3
+     0.525   26    33   28    21   21    10    9    15    8     8   2     2
+     0.53    40    39   30    28   18    25   23    18   12     6   2     8
+     0.535   46    38   30    30   26    32   13    21   17    15   7     9
+     0.54    32    27   26    26   19    22   31    15   21    17  12    12
+     0.545   12    13   21    12   15    11   17    13    9    10   6     3
+     0.55    10    12    8    18   14     4    8     8   13    12   8    10
+     0.555   13     4    7     5    8     9    9     6    3     7   8     8
+     0.56     3     3    2     3    5     2    3     2    4     5   6     2
+     0.565    1     1    0     1    1     3    3     2    2     8   5     3
+     0.57     1     1    0     3    0     3    1     3    4     0   5     1
+     0.575    0     1    1     3    2     1    1     2    2     0   2     1
      0.58     0     0    0     0    3     0    1     1    1     1   1     3
      0.585    0     0    0     0    1     0    0     0    0     0   1     0
      0.59     0     0    0     0    0     0    0     0    0     0   0     0
@@ -663,25 +1851,25 @@ Prediction 0.61 0.615 0.62 0.625 0.63 0.635 0.64 0.645 0.65 0.655 0.66 0.665
      0.505    0     0    0     1    0     0    0     0    0     0    0     0
      0.51     2     0    0     0    0     0    0     0    0     0    0     0
      0.515    2     3    1     0    0     0    0     0    0     0    0     0
-     0.52     3     4    2     1    0     1    0     0    0     0    0     0
+     0.52     3     4    2     1    0     1    0     1    0     0    0     0
      0.525    2     3    3     1    1     2    0     1    0     0    0     0
      0.53     0     6    3     2    1     1    0     1    0     0    0     0
-     0.535    7     3    7     4    6     1    2     2    2     0    0     0
-     0.54     6     5    1     4    1     3    1     1    1     0    0     0
-     0.545    6     3    2     4    2     2    0     1    0     0    0     1
-     0.55    10     3    0     1    1     0    1     0    0     1    0     0
-     0.555    6     4    5     1    1     3    2     2    1     2    1     1
-     0.56     1     2    2     1    2     1    1     0    0     3    0     0
-     0.565    3     3    2     1    2     0    1     0    1     1    2     0
-     0.57     1     3    6     2    3     2    2     0    0     0    0     1
-     0.575    2     1    1     0    1     0    2     0    0     0    2     1
+     0.535    7     3    7     4    7     1    2     1    2     0    0     0
+     0.54     6     5    1     4    1     3    0     0    0     0    0     0
+     0.545    7     4    2     4    2     2    0     0    1     0    0     1
+     0.55    10     3    0     1    1     0    2     0    0     1    0     0
+     0.555    5     4    5     1    0     3    2     2    1     2    1     1
+     0.56     1     1    2     1    2     1    1     0    0     3    0     0
+     0.565    4     3    2     1    2     0    1     0    1     1    2     0
+     0.57     1     3    6     2    4     2    2     0    0     0    0     1
+     0.575    2     1    1     0    1     0    2     1    0     0    1     1
      0.58     2     1    0     0    1     1    0     0    2     0    0     0
-     0.585    1     0    1     2    0     0    0     1    1     0    0     0
+     0.585    0     0    1     2    0     0    0     2    1     0    0     0
      0.59     0     0    1     0    0     0    1     0    0     0    0     0
-     0.595    1     0    0     1    1     0    0     0    0     0    0     0
+     0.595    1     0    0     1    0     0    0     0    0     0    0     0
      0.6      0     0    0     0    1     0    0     0    0     0    0     0
      0.605    0     0    0     0    0     0    0     0    0     0    0     0
-     0.61     0     0    0     0    0     0    0     0    0     0    0     0
+     0.61     0     0    0     0    0     0    0     0    0     0    1     0
      0.615    0     0    0     0    0     0    0     0    0     0    0     0
      0.62     0     0    0     0    0     0    0     0    0     0    0     0
      0.625    0     0    0     0    0     0    0     0    0     0    0     0
@@ -791,15 +1979,15 @@ Prediction 0.67 0.675 0.68 0.685 0.69 0.695 0.7 0.705 0.71 0.715 0.725
      0.725    0     0    0     0    0     0   0     0    0     0     0
 
 Overall Statistics
-                                          
-               Accuracy : 0.0658          
-                 95% CI : (0.0619, 0.0699)
-    No Information Rate : 0.0404          
-    P-Value [Acc > NIR] : < 2.2e-16       
-                                          
-                  Kappa : 0.0325          
-                                          
- Mcnemar's Test P-Value : NA              
+                                         
+               Accuracy : 0.0648         
+                 95% CI : (0.061, 0.0689)
+    No Information Rate : 0.0404         
+    P-Value [Acc > NIR] : < 2.2e-16      
+                                         
+                  Kappa : 0.0315         
+                                         
+ Mcnemar's Test P-Value : NA             
 
 Statistics by Class:
 
@@ -841,112 +2029,112 @@ Detection Prevalence    0.000000     0.000000    0.000000    6.685e-05
 Balanced Accuracy       0.500000     0.500000    0.500000    5.000e-01
                      Class: 0.39 Class: 0.395 Class: 0.4 Class: 0.405
 Sensitivity            0.000e+00    0.000e+00  0.0000000    0.0000000
-Specificity            9.999e-01    9.999e-01  0.9996639    0.9996633
+Specificity            9.999e-01    9.999e-01  0.9996639    0.9995960
 Pos Pred Value         0.000e+00    0.000e+00  0.0000000    0.0000000
-Neg Pred Value         9.970e-01    9.960e-01  0.9945830    0.9927774
+Neg Pred Value         9.970e-01    9.960e-01  0.9945830    0.9927769
 Prevalence             3.008e-03    4.011e-03  0.0054152    0.0072202
 Detection Rate         0.000e+00    0.000e+00  0.0000000    0.0000000
-Detection Prevalence   6.685e-05    6.685e-05  0.0003343    0.0003343
-Balanced Accuracy      5.000e-01    5.000e-01  0.4998320    0.4998316
+Detection Prevalence   6.685e-05    6.685e-05  0.0003343    0.0004011
+Balanced Accuracy      5.000e-01    5.000e-01  0.4998320    0.4997980
                      Class: 0.41 Class: 0.415 Class: 0.42 Class: 0.425
-Sensitivity            0.0157480     0.000000   0.0170455    0.0153846
-Specificity            0.9996629     0.998853   0.9979705    0.9967486
-Pos Pred Value         0.2857143     0.000000   0.0909091    0.0588235
-Neg Pred Value         0.9916394     0.990563   0.9884087    0.9871201
-Prevalence             0.0084904     0.009426   0.0117663    0.0130365
-Detection Rate         0.0001337     0.000000   0.0002006    0.0002006
-Detection Prevalence   0.0004680     0.001137   0.0022062    0.0034095
-Balanced Accuracy      0.5077054     0.499426   0.5075080    0.5060666
+Sensitivity            0.0236220    7.092e-03   0.0170455    0.0153846
+Specificity            0.9996629    9.989e-01   0.9979029    0.9968841
+Pos Pred Value         0.3750000    5.882e-02   0.0882353    0.0612245
+Neg Pred Value         0.9917057    9.906e-01   0.9884079    0.9871219
+Prevalence             0.0084904    9.426e-03   0.0117663    0.0130365
+Detection Rate         0.0002006    6.685e-05   0.0002006    0.0002006
+Detection Prevalence   0.0005348    1.137e-03   0.0022730    0.0032758
+Balanced Accuracy      0.5116425    5.030e-01   0.5074742    0.5061344
                      Class: 0.43 Class: 0.435 Class: 0.44 Class: 0.445
-Sensitivity            0.0273973    0.0334572   0.0201342     0.021472
-Specificity            0.9960649    0.9918987   0.9892224     0.990022
-Pos Pred Value         0.0937500    0.0703125   0.0365854     0.045752
-Neg Pred Value         0.9856989    0.9824680   0.9802623     0.978453
-Prevalence             0.0146410    0.0179837   0.0199224     0.021794
-Detection Rate         0.0004011    0.0006017   0.0004011     0.000468
-Detection Prevalence   0.0042786    0.0085573   0.0109640     0.010229
-Balanced Accuracy      0.5117311    0.5126780   0.5046783     0.505747
+Sensitivity            0.0273973    0.0334572    0.023490     0.021472
+Specificity            0.9958613    0.9918987    0.989495     0.989680
+Pos Pred Value         0.0895522    0.0703125    0.043478     0.044304
+Neg Pred Value         0.9856961    0.9824680    0.980334     0.978446
+Prevalence             0.0146410    0.0179837    0.019922     0.021794
+Detection Rate         0.0004011    0.0006017    0.000468     0.000468
+Detection Prevalence   0.0044792    0.0085573    0.010763     0.010563
+Balanced Accuracy      0.5116293    0.5126780    0.506493     0.505576
                      Class: 0.45 Class: 0.455 Class: 0.46 Class: 0.465
-Sensitivity             0.060367     0.061905    0.077922     0.060086
-Specificity             0.976676     0.972899    0.966611     0.968810
-Pos Pred Value          0.063361     0.061905    0.069231     0.058333
-Neg Pred Value          0.975471     0.972899    0.970495     0.969747
+Sensitivity             0.055118     0.059524    0.077922     0.057940
+Specificity             0.977019     0.972623    0.966129     0.968948
+Pos Pred Value          0.058989     0.059102    0.068311     0.056604
+Neg Pred Value          0.975346     0.972824    0.970480     0.969684
 Prevalence              0.025471     0.028079    0.030886     0.031154
-Detection Rate          0.001538     0.001738    0.002407     0.001872
-Detection Prevalence    0.024268     0.028079    0.034764     0.032090
-Balanced Accuracy       0.518522     0.517402    0.522267     0.514448
+Detection Rate          0.001404     0.001671    0.002407     0.001805
+Detection Prevalence    0.023800     0.028279    0.035232     0.031889
+Balanced Accuracy       0.516068     0.516074    0.522025     0.513444
                      Class: 0.47 Class: 0.475 Class: 0.48 Class: 0.485
-Sensitivity             0.087954     0.118613    0.083481     0.125850
-Specificity             0.954832     0.944483    0.943175     0.939248
-Pos Pred Value          0.065903     0.075145    0.054335     0.078141
-Neg Pred Value          0.966550     0.965728    0.963386     0.963315
+Sensitivity             0.082218     0.120438    0.079929     0.125850
+Specificity             0.954416     0.945524    0.942966     0.939040
+Pos Pred Value          0.061341     0.077556    0.051963     0.077895
+Neg Pred Value          0.966332     0.965833    0.963242     0.963307
 Prevalence              0.034965     0.036636    0.037639     0.039310
-Detection Rate          0.003075     0.004346    0.003142     0.004947
-Detection Prevalence    0.046664     0.057829    0.057829     0.063311
-Balanced Accuracy       0.521393     0.531548    0.513328     0.532549
+Detection Rate          0.002875     0.004412    0.003008     0.004947
+Detection Prevalence    0.046865     0.056893    0.057895     0.063511
+Balanced Accuracy       0.518317     0.532981    0.511448     0.532445
                      Class: 0.49 Class: 0.495 Class: 0.5 Class: 0.505
-Sensitivity             0.132773     0.116554   0.114050     0.102916
-Specificity             0.934484     0.937352   0.933185     0.944765
-Pos Pred Value          0.077451     0.071207   0.067121     0.070258
-Neg Pred Value          0.962979     0.962613   0.961522     0.962918
+Sensitivity             0.131092     0.113176   0.112397     0.099485
+Specificity             0.935111     0.936447   0.934230     0.944278
+Pos Pred Value          0.077228     0.068367   0.067194     0.067520
+Neg Pred Value          0.962934     0.962441   0.961494     0.962763
 Prevalence              0.039778     0.039577   0.040447     0.038976
-Detection Rate          0.005281     0.004613   0.004613     0.004011
-Detection Prevalence    0.068191     0.064781   0.068726     0.057093
-Balanced Accuracy       0.533629     0.526953   0.523617     0.523841
+Detection Rate          0.005215     0.004479   0.004546     0.003878
+Detection Prevalence    0.067522     0.065517   0.067656     0.057427
+Balanced Accuracy       0.533102     0.524811   0.523313     0.521882
                      Class: 0.51 Class: 0.515 Class: 0.52 Class: 0.525
-Sensitivity             0.087971     0.075269     0.09341     0.081800
-Specificity             0.958267     0.946389     0.94664     0.965720
-Pos Pred Value          0.075385     0.051597     0.06220     0.074627
-Neg Pred Value          0.964495     0.963518     0.96499     0.968867
-Prevalence              0.037238     0.037304     0.03650     0.032692
-Detection Rate          0.003276     0.002808     0.00341     0.002674
-Detection Prevalence    0.043455     0.054419     0.05482     0.035834
-Balanced Accuracy       0.523119     0.510829     0.52002     0.523760
+Sensitivity             0.086176     0.077061    0.095238      0.07771
+Specificity             0.957711     0.946181    0.945948      0.96558
+Pos Pred Value          0.073059     0.052567    0.062575      0.07090
+Neg Pred Value          0.964408     0.963579    0.965031      0.96873
+Prevalence              0.037238     0.037304    0.036502      0.03269
+Detection Rate          0.003209     0.002875    0.003476      0.00254
+Detection Prevalence    0.043923     0.054686    0.055556      0.03583
+Balanced Accuracy       0.521944     0.511621    0.520593      0.52165
                      Class: 0.53 Class: 0.535 Class: 0.54 Class: 0.545
-Sensitivity             0.073469     0.102725    0.053812     0.036176
-Specificity             0.963575     0.958014    0.970783     0.983735
-Pos Pred Value          0.063943     0.074581    0.053571     0.055777
-Neg Pred Value          0.968461     0.970072    0.970917     0.974638
+Sensitivity             0.073469     0.100629    0.053812     0.036176
+Specificity             0.963782     0.958152    0.970645     0.983735
+Pos Pred Value          0.064286     0.073394    0.053333     0.055777
+Neg Pred Value          0.968468     0.970008    0.970913     0.974638
 Prevalence              0.032758     0.031889    0.029817     0.025872
-Detection Rate          0.002407     0.003276    0.001604     0.000936
-Detection Prevalence    0.037639     0.043923    0.029951     0.016780
-Balanced Accuracy       0.518522     0.530370    0.512297     0.509955
+Detection Rate          0.002407     0.003209    0.001604     0.000936
+Detection Prevalence    0.037438     0.043722    0.030084     0.016780
+Balanced Accuracy       0.518626     0.529390    0.512228     0.509955
                      Class: 0.55 Class: 0.555 Class: 0.56 Class: 0.565
-Sensitivity            0.0290698    0.0158730   0.0075472    4.082e-03
-Specificity            0.9876830    0.9906440   0.9956442    9.963e-01
-Pos Pred Value         0.0526316    0.0352113   0.0303030    1.818e-02
-Neg Pred Value         0.9773835    0.9790767   0.9823395    9.836e-01
+Sensitivity            0.0290698    0.0126984   0.0075472    4.082e-03
+Specificity            0.9876830    0.9911220   0.9957122    9.963e-01
+Pos Pred Value         0.0526316    0.0298507   0.0307692    1.818e-02
+Neg Pred Value         0.9773835    0.9790205   0.9823407    9.836e-01
 Prevalence             0.0229977    0.0210590   0.0177163    1.638e-02
-Detection Rate         0.0006685    0.0003343   0.0001337    6.685e-05
-Detection Prevalence   0.0127022    0.0094932   0.0044124    3.677e-03
-Balanced Accuracy      0.5083764    0.5032585   0.5015957    5.002e-01
+Detection Rate         0.0006685    0.0002674   0.0001337    6.685e-05
+Detection Prevalence   0.0127022    0.0089584   0.0043455    3.677e-03
+Balanced Accuracy      0.5083764    0.5019102   0.5016297    5.002e-01
                      Class: 0.57 Class: 0.575 Class: 0.58 Class: 0.585
 Sensitivity             0.000000    5.435e-03   6.173e-03    0.0000000
-Specificity             0.996812    9.984e-01   9.989e-01    0.9994603
-Pos Pred Value          0.000000    4.000e-02   5.556e-02    0.0000000
-Neg Pred Value          0.985447    9.877e-01   9.892e-01    0.9909699
+Specificity             0.996947    9.981e-01   9.989e-01    0.9994603
+Pos Pred Value          0.000000    3.448e-02   5.556e-02    0.0000000
+Neg Pred Value          0.985449    9.877e-01   9.892e-01    0.9909699
 Prevalence              0.014507    1.230e-02   1.083e-02    0.0090253
 Detection Rate          0.000000    6.685e-05   6.685e-05    0.0000000
-Detection Prevalence    0.003142    1.671e-03   1.203e-03    0.0005348
-Balanced Accuracy       0.498406    5.019e-01   5.025e-01    0.4997301
+Detection Prevalence    0.003008    1.939e-03   1.203e-03    0.0005348
+Balanced Accuracy       0.498474    5.018e-01   5.025e-01    0.4997301
                      Class: 0.59 Class: 0.595 Class: 0.6 Class: 0.605
 Sensitivity            0.0000000    9.346e-03  0.0000000      0.00000
-Specificity            0.9998653    9.997e-01  0.9998656      1.00000
-Pos Pred Value         0.0000000    2.000e-01  0.0000000          NaN
+Specificity            0.9998653    9.998e-01  0.9998656      1.00000
+Pos Pred Value         0.0000000    2.500e-01  0.0000000          NaN
 Neg Pred Value         0.9923776    9.929e-01  0.9948516      0.99512
 Prevalence             0.0076213    7.153e-03  0.0051477      0.00488
 Detection Rate         0.0000000    6.685e-05  0.0000000      0.00000
-Detection Prevalence   0.0001337    3.343e-04  0.0001337      0.00000
-Balanced Accuracy      0.4999326    5.045e-01  0.4999328      0.50000
+Detection Prevalence   0.0001337    2.674e-04  0.0001337      0.00000
+Balanced Accuracy      0.4999326    5.046e-01  0.4999328      0.50000
                      Class: 0.61 Class: 0.615 Class: 0.62 Class: 0.625
-Sensitivity             0.000000     0.000000    0.000000     0.000000
-Specificity             1.000000     1.000000    1.000000     1.000000
-Pos Pred Value               NaN          NaN         NaN          NaN
-Neg Pred Value          0.996189     0.996992    0.997526     0.998262
-Prevalence              0.003811     0.003008    0.002474     0.001738
-Detection Rate          0.000000     0.000000    0.000000     0.000000
-Detection Prevalence    0.000000     0.000000    0.000000     0.000000
-Balanced Accuracy       0.500000     0.500000    0.500000     0.500000
+Sensitivity            0.000e+00     0.000000    0.000000     0.000000
+Specificity            9.999e-01     1.000000    1.000000     1.000000
+Pos Pred Value         0.000e+00          NaN         NaN          NaN
+Neg Pred Value         9.962e-01     0.996992    0.997526     0.998262
+Prevalence             3.811e-03     0.003008    0.002474     0.001738
+Detection Rate         0.000e+00     0.000000    0.000000     0.000000
+Detection Prevalence   6.685e-05     0.000000    0.000000     0.000000
+Balanced Accuracy      5.000e-01     0.500000    0.500000     0.500000
                      Class: 0.63 Class: 0.635 Class: 0.64 Class: 0.645
 Sensitivity             0.000000     0.000000   0.0000000    0.0000000
 Specificity             1.000000     1.000000   1.0000000    1.0000000
@@ -992,21 +2180,10 @@ Prevalence                     0            0            0
 Detection Rate                 0            0            0
 Detection Prevalence           0            0            0
 Balanced Accuracy             NA           NA           NA
+> 
+
 > # Salvar matrizes de confusão
 write.csv(as.data.frame(conf_rna$table), "resultados/matriz_confusao_rna.csv", row.names = FALSE)
-Error in file(file, ifelse(append, "a", "w")) : 
-  não é possível abrir a conexão
-Além disso: Mensagen de aviso:
-In file(file, ifelse(append, "a", "w")) :
-  não foi possível abrir o arquivo 'resultados/matriz_confusao_rna.csv': Permissão negada
-> # Salvar matrizes de confusão
-write.csv(as.data.frame(conf_rna$table), "resultados/matriz_confusao_rna.csv", row.names = FALSE)
-> write.csv(as.data.frame(conf_rf$table), "resultados/matriz_confusao_rf.csv", row.names = FALSE)
-Error in file(file, ifelse(append, "a", "w")) : 
-  não é possível abrir a conexão
-Além disso: Mensagen de aviso:
-In file(file, ifelse(append, "a", "w")) :
-  não foi possível abrir o arquivo 'resultados/matriz_confusao_rf.csv': Permissão negada
 > write.csv(as.data.frame(conf_rf$table), "resultados/matriz_confusao_rf.csv", row.names = FALSE)
 > # Calcular acurácias
 acuracia_rna <- conf_rna$overall["Accuracy"]
@@ -1014,3 +2191,5 @@ acuracia_rna <- conf_rna$overall["Accuracy"]
 > # Salvar AUCs em txt
 texto_acuracia <- paste0("Acurácia RNA: ", round(acuracia_rna, 4), "\nAcurácia Random Forest: ", round(acuracia_rf, 4))
 > writeLines(texto_acuracia, "resultados/acuracia_resultados.txt")
+> 
+
