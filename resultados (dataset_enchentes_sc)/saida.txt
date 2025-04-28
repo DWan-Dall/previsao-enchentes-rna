@@ -1,0 +1,265 @@
+Output created: Previsao_Enchentes.html
+> if (!dir.exists("resultados")) {
+  dir.create("resultados")
+}
+> dados <- read.csv("dataset_enchentes_sc.csv")
+str(dados)
+'data.frame':   300 obs. of  8 variables:
+ $ data           : chr  "2022-01-01" "2022-01-02" "2022-01-03" "2022-01-04" ...
+ $ cidade         : chr  "Florianópolis" "Biguaçu" "Itapema" "Imbituba" ...
+ $ precipitacao_mm: num  41.4 26.8 29.7 12.4 51.6 26 10.6 62.4 31.4 30.3 ...
+ $ umidade_solo   : num  50.8 69.6 63.3 76.5 95.6 81.3 45 32.2 48.4 71.7 ...
+ $ nivel_mar_m    : num  2.49 1.3 1.91 1.06 1.65 1.69 1.49 1.27 1.39 1.34 ...
+ $ elevacao_m     : num  41.3 39.1 35.4 1.8 15.2 13.2 18 4.4 46.8 27.7 ...
+ $ uso_solo       : chr  "misto" "rural" "vegetação" "urbano" ...
+ $ enchente       : int  0 0 0 0 0 0 0 0 0 0 ...
+> ## 2. Pré-processamento dos dados
+
+# Converter variáveis categóricas para fator
+dados$uso_solo <- as.factor(dados$uso_solo)
+> dados$cidade <- as.factor(dados$cidade)
+> dados_norm <- dados %>%
+  mutate(across(c(precipitacao_mm, umidade_solo, nivel_mar_m, elevacao_m), scale))
+> # Separar em treino (70%) e teste (30%)
+set.seed(123)
+> train_index <- createDataPartition(dados_norm$enchente, p = 0.7, list = FALSE)
+> train_data <- dados_norm[train_index, ]
+> test_data <- dados_norm[-train_index, ]
+> modelo <- nnet(enchente ~ precipitacao_mm + umidade_solo + nivel_mar_m + elevacao_m + uso_solo + cidade,
+               data = train_data, size = 5, decay = 0.01, maxit = 200, trace = FALSE)
+> summary(modelo)
+a 26-5-1 network with 141 weights
+options were - decay=0.01
+  b->h1  i1->h1  i2->h1  i3->h1  i4->h1  i5->h1  i6->h1  i7->h1  i8->h1  i9->h1 
+   1.11   -0.01   -0.68   -0.38    0.72    0.53   -0.33   -0.33    0.19    0.06 
+i10->h1 i11->h1 i12->h1 i13->h1 i14->h1 i15->h1 i16->h1 i17->h1 i18->h1 i19->h1 
+   0.09    0.31   -1.05    0.08    0.06    0.14    0.24    0.00    0.10    0.05 
+i20->h1 i21->h1 i22->h1 i23->h1 i24->h1 i25->h1 i26->h1 
+   0.19    0.36    0.01    0.02   -0.60    0.28    0.31 
+  b->h2  i1->h2  i2->h2  i3->h2  i4->h2  i5->h2  i6->h2  i7->h2  i8->h2  i9->h2 
+   1.04   -0.85    2.03   -1.79    0.13    0.68   -0.02   -0.41    0.12    0.05 
+i10->h2 i11->h2 i12->h2 i13->h2 i14->h2 i15->h2 i16->h2 i17->h2 i18->h2 i19->h2 
+   0.12    0.06   -0.62    0.03    0.07    0.16    0.14    0.00    0.09    0.04 
+i20->h2 i21->h2 i22->h2 i23->h2 i24->h2 i25->h2 i26->h2 
+   0.09    0.55    0.00    0.03   -0.33    0.04    0.37 
+  b->h3  i1->h3  i2->h3  i3->h3  i4->h3  i5->h3  i6->h3  i7->h3  i8->h3  i9->h3 
+   1.09   -0.01   -0.69   -0.37    0.72    0.52   -0.33   -0.33    0.19    0.06 
+i10->h3 i11->h3 i12->h3 i13->h3 i14->h3 i15->h3 i16->h3 i17->h3 i18->h3 i19->h3 
+   0.09    0.31   -1.04    0.08    0.06    0.14    0.23    0.00    0.09    0.05 
+i20->h3 i21->h3 i22->h3 i23->h3 i24->h3 i25->h3 i26->h3 
+   0.19    0.36    0.01    0.02   -0.60    0.28    0.30 
+  b->h4  i1->h4  i2->h4  i3->h4  i4->h4  i5->h4  i6->h4  i7->h4  i8->h4  i9->h4 
+   1.09   -0.01   -0.69   -0.37    0.72    0.52   -0.32   -0.33    0.19    0.06 
+i10->h4 i11->h4 i12->h4 i13->h4 i14->h4 i15->h4 i16->h4 i17->h4 i18->h4 i19->h4 
+   0.09    0.31   -1.04    0.08    0.06    0.14    0.23    0.00    0.09    0.05 
+i20->h4 i21->h4 i22->h4 i23->h4 i24->h4 i25->h4 i26->h4 
+   0.19    0.36    0.01    0.02   -0.59    0.28    0.30 
+  b->h5  i1->h5  i2->h5  i3->h5  i4->h5  i5->h5  i6->h5  i7->h5  i8->h5  i9->h5 
+   0.66   -1.25   -0.38   -0.22    0.37    0.20    0.16   -0.30    0.14    0.04 
+i10->h5 i11->h5 i12->h5 i13->h5 i14->h5 i15->h5 i16->h5 i17->h5 i18->h5 i19->h5 
+   0.04    0.13   -0.40    0.07    0.02    0.05    0.14    0.00    0.09    0.04 
+i20->h5 i21->h5 i22->h5 i23->h5 i24->h5 i25->h5 i26->h5 
+   0.08    0.12    0.00    0.02   -0.25    0.16    0.06 
+ b->o h1->o h2->o h3->o h4->o h5->o 
+ 2.36 -2.32 -3.50 -2.30 -2.30 -1.78 
+> ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+> train_data$enchente <- as.factor(ifelse(train_data$enchente == 1, "Sim", "Não"))
+> test_data$enchente <- as.factor(ifelse(test_data$enchente == 1, "Sim", "Não"))
+> set.seed(123)
+> modelo_rna <- train(enchente ~ precipitacao_mm + umidade_solo + nivel_mar_m + elevacao_m + uso_solo + cidade,
+                    data = train_data,
+                    method = "nnet",
+                    trControl = ctrl,
+                    metric = "ROC",
+                    tuneLength = 5,
+                    trace = FALSE)
+Mensagen de aviso:
+In nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo,  :
+  There were missing values in resampled performance measures.
+> print(modelo_rna)
+Neural Network 
+
+210 samples
+  6 predictor
+  2 classes: 'Não', 'Sim' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 168, 168, 168, 169, 167 
+Resampling results across tuning parameters:
+
+  size  decay  ROC        Sens       Spec
+  1     0e+00  0.5000000  0.9952381  0.0 
+  1     1e-04  0.9149245  0.9808362  0.5 
+  1     1e-03  0.9271196  0.9855981  0.0 
+  1     1e-02  0.9271196  0.9904762  0.0 
+  1     1e-01  0.8916957  1.0000000  0.0 
+  3     0e+00  0.5000000  0.9952381  0.0 
+  3     1e-04  0.8670151  0.9904762  0.0 
+  3     1e-03  0.9152149  0.9904762  0.0 
+  3     1e-02  0.9033101  0.9904762  0.0 
+  3     1e-01  0.9036005  1.0000000  0.0 
+  5     0e+00  0.5000000  0.9857143  0.0 
+  5     1e-04  0.9393148  0.9952381  0.0 
+  5     1e-03  0.9033101  0.9904762  0.0 
+  5     1e-02  0.9033101  1.0000000  0.0 
+  5     1e-01  0.9155052  1.0000000  0.0 
+  7     0e+00  0.4819977  0.9952381  0.0 
+  7     1e-04  0.9637050  0.9952381  0.0 
+  7     1e-03  0.9279907  0.9952381  0.0 
+  7     1e-02  0.9033101  1.0000000  0.0 
+  7     1e-01  0.9396051  1.0000000  0.0 
+  9     0e+00  0.4696574  1.0000000  0.0 
+  9     1e-04  0.9271196  0.9952381  0.0 
+  9     1e-03  0.9274100  0.9952381  0.0 
+  9     1e-02  0.9033101  1.0000000  0.0 
+  9     1e-01  0.9396051  1.0000000  0.0 
+
+ROC was used to select the optimal model using the largest value.
+The final values used for the model were size = 7 and decay = 1e-04.
+> set.seed(123)
+> modelo_rf <- train(enchente ~ precipitacao_mm + umidade_solo + nivel_mar_m + elevacao_m + uso_solo + cidade,
+                   data = train_data,
+                   method = "rf",
+                   trControl = ctrl,
+                   metric = "ROC",
+                   tuneLength = 3)
+Mensagen de aviso:
+In nominalTrainWorkflow(x = x, y = y, wts = weights, info = trainInfo,  :
+  There were missing values in resampled performance measures.
+> print(modelo_rf)
+Random Forest 
+
+210 samples
+  6 predictor
+  2 classes: 'Não', 'Sim' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 168, 168, 168, 169, 167 
+Resampling results across tuning parameters:
+
+  mtry  ROC        Sens  Spec
+   2    0.8964866  1     0   
+  14    0.9759001  1     0   
+  26    0.9393148  1     0   
+
+ROC was used to select the optimal model using the largest value.
+The final value used for the model was mtry = 14.
+> pred_rna <- predict(modelo_rna, newdata = test_data)
+> pred_rf <- predict(modelo_rf, newdata = test_data)
+> # Matrizes de confusão
+conf_rna <- confusionMatrix(pred_rna, test_data$enchente)
+> conf_rf <- confusionMatrix(pred_rf, test_data$enchente)
+> conf_rna <- confusionMatrix(pred_rna, test_data$enchente)
+> print(conf_rna)
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Não Sim
+       Não  89   0
+       Sim   0   1
+                                     
+               Accuracy : 1          
+                 95% CI : (0.9598, 1)
+    No Information Rate : 0.9889     
+    P-Value [Acc > NIR] : 0.3658     
+                                     
+                  Kappa : 1          
+                                     
+ Mcnemar's Test P-Value : NA         
+                                     
+            Sensitivity : 1.0000     
+            Specificity : 1.0000     
+         Pos Pred Value : 1.0000     
+         Neg Pred Value : 1.0000     
+             Prevalence : 0.9889     
+         Detection Rate : 0.9889     
+   Detection Prevalence : 0.9889     
+      Balanced Accuracy : 1.0000     
+                                     
+       'Positive' Class : Não        
+                                     
+> print(conf_rf)
+Confusion Matrix and Statistics
+
+          Reference
+Prediction Não Sim
+       Não  89   1
+       Sim   0   0
+                                          
+               Accuracy : 0.9889          
+                 95% CI : (0.9396, 0.9997)
+    No Information Rate : 0.9889          
+    P-Value [Acc > NIR] : 0.7358          
+                                          
+                  Kappa : 0               
+                                          
+ Mcnemar's Test P-Value : 1.0000          
+                                          
+            Sensitivity : 1.0000          
+            Specificity : 0.0000          
+         Pos Pred Value : 0.9889          
+         Neg Pred Value :    NaN          
+             Prevalence : 0.9889          
+         Detection Rate : 0.9889          
+   Detection Prevalence : 1.0000          
+      Balanced Accuracy : 0.5000          
+                                          
+       'Positive' Class : Não             
+                                          
+> # Probabilidades para curvas ROC
+prob_rna <- predict(modelo_rna, newdata = test_data, type = "prob")[, "Sim"]
+> prob_rf <- predict(modelo_rf, newdata = test_data, type = "prob")[, "Sim"]
+> # Curvas ROC
+roc_rna <- roc(response = test_data$enchente, predictor = prob_rna, levels = rev(levels(test_data$enchente)))
+Setting direction: controls > cases
+> roc_rf <- roc(response = test_data$enchente, predictor = prob_rf, levels = rev(levels(test_data$enchente)))
+Setting direction: controls > cases
+> ## 6. Visualização das Curvas ROC
+
+# Preparar dados para ggplot
+roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specificities, Modelo = "RNA")
+> roc_rf_data <- data.frame(TPR = roc_rf$sensitivities, FPR = 1 - roc_rf$specificities, Modelo = "Random Forest")
+> roc_data <- bind_rows(roc_rna_data, roc_rf_data)
+> grafico_roc <- ggplot(roc_data, aes(x = FPR, y = TPR, color = Modelo)) +
+  geom_line(size = 1.2) +
+  geom_abline(linetype = "dashed", color = "gray") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Curvas ROC - RNA vs Random Forest",
+    subtitle = paste0("AUC RNA: ", round(auc(roc_rna), 3), " | AUC Random Forest: ", round(auc(roc_rf), 3)),
+    x = "Taxa de Falsos Positivos (1 - Especificidade)",
+    y = "Taxa de Verdadeiros Positivos (Sensibilidade)",
+    color = "Modelo"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    legend.position = "bottom"
+  )
+Mensagen de aviso:
+Using size aesthetic for lines was deprecated in ggplot2 3.4.0.
+ℹ Please use linewidth instead.
+This warning is displayed once every 8 hours.
+Call lifecycle::last_lifecycle_warnings() to see where this warning was generated. 
+> print(grafico_roc)
+> # Salvar o gráfico
+ggsave("resultados/curva_roc_comparativa.png", plot = grafico_roc, width = 8, height = 6, dpi = 300)
+> ## 7. Salvar Resultados em Arquivos
+
+# Salvar Matrizes de Confusão
+write.csv(as.data.frame(conf_rna$table), "resultados/matriz_confusao_rna.csv", row.names = FALSE)
+> write.csv(as.data.frame(conf_rf$table), "resultados/matriz_confusao_rf.csv", row.names = FALSE)
+> # Salvar AUCs em txt
+auc_texto <- paste0("AUC RNA: ", round(auc(roc_rna), 4), "\nAUC Random Forest: ", round(auc(roc_rf), 4))
+> writeLines(auc_texto, "resultados/auc_resultados.txt")
+> ## 8. Conclusão Final
+
+# Imprimir AUCs
+auc_rna <- auc(roc_rna)
+> auc_rf <- auc(roc_rf)
+> cat("AUC RNA:", auc_rna, "\n")
+AUC RNA: 1 
+> cat("AUC Random Forest:", auc_rf, "\n")
+AUC Random Forest: 0.9775281 

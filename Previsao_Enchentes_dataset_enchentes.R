@@ -120,7 +120,7 @@ roc_data <- bind_rows(roc_rna_data, roc_rf_data)
 # Criar o gráfico
 
 grafico_roc <- ggplot(roc_data, aes(x = FPR, y = TPR, color = Modelo)) +
-  geom_line(size = 1.2) +
+  geom_line(linewidth = 1.2) +
   geom_abline(linetype = "dashed", color = "gray") +
   theme_minimal(base_size = 14) +
   labs(

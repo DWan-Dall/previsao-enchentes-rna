@@ -1,0 +1,2 @@
+Acurácia RNA: 0.4916
+Acurácia Random Forest: 0.0658
