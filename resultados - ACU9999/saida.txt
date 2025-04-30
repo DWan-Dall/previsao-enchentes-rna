@@ -1,0 +1,289 @@
+> library(tidyverse)
+library(caret)
+library(nnet)
+library(pROC)
+library(ggplot2)
+library(DMwR2)
+library(smotefamily)
+> if (!dir.exists("resultados")) {
+  dir.create("resultados")
+}
+> dados <- read.csv("dataset_flood.csv")
+str(dados)
+'data.frame':   50000 obs. of  21 variables:
+ $ MonsoonIntensity               : int  3 8 3 4 3 6 6 7 6 4 ...
+ $ TopographyDrainage             : int  8 4 10 4 7 6 7 3 3 3 ...
+ $ RiverManagement                : int  6 5 4 2 5 6 4 5 5 5 ...
+ $ Deforestation                  : int  6 7 1 7 2 4 5 5 4 6 ...
+ $ Urbanization                   : int  4 7 7 3 5 6 5 6 5 2 ...
+ $ ClimateChange                  : int  4 9 5 4 8 4 5 6 11 3 ...
+ $ DamsQuality                    : int  6 1 4 1 5 3 4 6 3 7 ...
+ $ Siltation                      : int  2 5 7 4 2 1 8 7 2 7 ...
+ $ AgriculturalPractices          : int  3 5 4 6 7 3 8 6 9 10 ...
+ $ Encroachments                  : int  2 4 9 4 5 5 4 5 7 4 ...
+ $ IneffectiveDisasterPreparedness: int  5 6 2 9 7 1 6 5 8 5 ...
+ $ DrainageSystems                : int  10 9 7 4 7 10 8 4 2 7 ...
+ $ CoastalVulnerability           : int  7 2 4 2 6 5 4 6 8 6 ...
+ $ Landslides                     : int  4 6 4 6 5 9 5 9 7 5 ...
+ $ Watersheds                     : int  2 2 8 6 3 5 4 7 5 6 ...
+ $ DeterioratingInfrastructure    : int  3 1 6 8 3 5 7 10 4 7 ...
+ $ PopulationScore                : int  4 1 1 8 4 7 7 6 9 5 ...
+ $ WetlandLoss                    : int  3 9 8 6 4 3 5 5 6 7 ...
+ $ InadequatePlanning             : int  2 1 3 6 3 3 4 4 5 4 ...
+ $ PoliticalFactors               : int  6 3 6 10 4 2 8 5 7 8 ...
+ $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
+> library(tidyverse)
+library(caret)
+library(nnet)
+library(pROC)
+library(ggplot2)
+library(DMwR2)
+library(smotefamily)
+> if (!dir.exists("resultados")) {
+  dir.create("resultados")
+}
+> dados <- read.csv("dataset_flood.csv")
+str(dados)
+'data.frame':   50000 obs. of  21 variables:
+ $ MonsoonIntensity               : int  3 8 3 4 3 6 6 7 6 4 ...
+ $ TopographyDrainage             : int  8 4 10 4 7 6 7 3 3 3 ...
+ $ RiverManagement                : int  6 5 4 2 5 6 4 5 5 5 ...
+ $ Deforestation                  : int  6 7 1 7 2 4 5 5 4 6 ...
+ $ Urbanization                   : int  4 7 7 3 5 6 5 6 5 2 ...
+ $ ClimateChange                  : int  4 9 5 4 8 4 5 6 11 3 ...
+ $ DamsQuality                    : int  6 1 4 1 5 3 4 6 3 7 ...
+ $ Siltation                      : int  2 5 7 4 2 1 8 7 2 7 ...
+ $ AgriculturalPractices          : int  3 5 4 6 7 3 8 6 9 10 ...
+ $ Encroachments                  : int  2 4 9 4 5 5 4 5 7 4 ...
+ $ IneffectiveDisasterPreparedness: int  5 6 2 9 7 1 6 5 8 5 ...
+ $ DrainageSystems                : int  10 9 7 4 7 10 8 4 2 7 ...
+ $ CoastalVulnerability           : int  7 2 4 2 6 5 4 6 8 6 ...
+ $ Landslides                     : int  4 6 4 6 5 9 5 9 7 5 ...
+ $ Watersheds                     : int  2 2 8 6 3 5 4 7 5 6 ...
+ $ DeterioratingInfrastructure    : int  3 1 6 8 3 5 7 10 4 7 ...
+ $ PopulationScore                : int  4 1 1 8 4 7 7 6 9 5 ...
+ $ WetlandLoss                    : int  3 9 8 6 4 3 5 5 6 7 ...
+ $ InadequatePlanning             : int  2 1 3 6 3 3 4 4 5 4 ...
+ $ PoliticalFactors               : int  6 3 6 10 4 2 8 5 7 8 ...
+ $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
+>
+> 
+> dados <- dados %>%
+  mutate(FloodRisk = ifelse(FloodProbability >= 0.6, "Alto", "Baixo"),
+         FloodRisk = as.factor(FloodRisk))
+> dados_norm <- dados %>%
+  mutate(across(
+    .cols = c(
+      MonsoonIntensity, TopographyDrainage, RiverManagement, Deforestation, Urbanization,
+      ClimateChange, DamsQuality, Siltation, AgriculturalPractices, Encroachments,
+      IneffectiveDisasterPreparedness, DrainageSystems, CoastalVulnerability, Landslides,
+      Watersheds, DeterioratingInfrastructure, PopulationScore, WetlandLoss,
+      InadequatePlanning, PoliticalFactors
+    ),
+    .fns = scale
+  ))
+> str(dados_norm)
+'data.frame':   50000 obs. of  22 variables:
+ $ MonsoonIntensity               : num [1:50000, 1] -0.89 1.345 -0.89 -0.443 -0.89 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ TopographyDrainage             : num [1:50000, 1] 1.342 -0.438 2.233 -0.438 0.897 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ RiverManagement                : num [1:50000, 1] 0.44102 -0.00714 -0.45531 -1.35165 -0.00714 ...
+  ..- attr(*, "scaled:center")= num 5.02
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Deforestation                  : num [1:50000, 1] 0.446 0.896 -1.803 0.896 -1.353 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.22
+ $ Urbanization                   : num [1:50000, 1] -0.44092 0.89648 0.89648 -0.88672 0.00488 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ ClimateChange                  : num [1:50000, 1] -0.44385 1.80157 0.00524 -0.44385 1.35248 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DamsQuality                    : num [1:50000, 1] 0.43859 -1.78858 -0.45228 -1.78858 -0.00684 ...
+  ..- attr(*, "scaled:center")= num 5.02
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ Siltation                      : num [1:50000, 1] -1.33859 0.00511 0.90091 -0.44279 -1.33859 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ AgriculturalPractices          : num [1:50000, 1] -0.89776 -0.00274 -0.45025 0.44477 0.89228 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Encroachments                  : num [1:50000, 1] -1.34116 -0.44895 1.78157 -0.44895 -0.00285 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ IneffectiveDisasterPreparedness: num [1:50000, 1] -0.00226 0.44697 -1.34992 1.79463 0.89619 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DrainageSystems                : num [1:50000, 1] 2.231 1.785 0.891 -0.45 0.891 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ CoastalVulnerability           : num [1:50000, 1] 0.89 -1.335 -0.445 -1.335 0.445 ...
+  ..- attr(*, "scaled:center")= num 5
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ Landslides                     : num [1:50000, 1] -0.4418 0.45597 -0.4418 0.45597 0.00708 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ Watersheds                     : num [1:50000, 1] -1.335 -1.335 1.353 0.457 -0.887 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ DeterioratingInfrastructure    : num [1:50000, 1] -0.891 -1.788 0.453 1.35 -0.891 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ PopulationScore                : num [1:50000, 1] -0.44 -1.78 -1.78 1.35 -0.44 ...
+  ..- attr(*, "scaled:center")= num 4.98
+  ..- attr(*, "scaled:scale")= num 2.24
+ $ WetlandLoss                    : num [1:50000, 1] -0.898 1.79 1.342 0.446 -0.45 ...
+  ..- attr(*, "scaled:center")= num 5.01
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ InadequatePlanning             : num [1:50000, 1] -1.343 -1.791 -0.894 0.451 -0.894 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.23
+ $ PoliticalFactors               : num [1:50000, 1] 0.449 -0.886 0.449 2.23 -0.441 ...
+  ..- attr(*, "scaled:center")= num 4.99
+  ..- attr(*, "scaled:scale")= num 2.25
+ $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
+ $ FloodRisk                      : Factor w/ 2 levels "Alto","Baixo": 2 2 2 2 2 2 2 2 2 2 ...
+> 
+> set.seed(42)
+train_index <- createDataPartition(dados_norm$FloodRisk, p = 0.7, list = FALSE) # Troca da variável alvo
+train_data <- dados_norm[train_index, ]
+test_data <- dados_norm[-train_index, ]
+> train_data$FloodRisk_num <- ifelse(train_data$FloodRisk == "Alto", 1, 0)
+> smote_result <- SMOTE(X = train_data[, -which(names(train_data) %in% c("FloodRisk", "FloodProbability", "FloodRisk_num"))],
+                      target = train_data$FloodRisk_num,
+                      K = 5,
+                      dup_size = 2  # <== Equivalente a perc.over = 200
+                      )
+> train_data_bal <- smote_result$data
+train_data_bal$FloodRisk <- as.factor(ifelse(train_data_bal$class == 1, "Alto", "Baixo"))
+train_data_bal$class <- NULL
+> baixos <- train_data_bal %>% filter(FloodRisk == "Baixo")
+altos <- train_data_bal %>% filter(FloodRisk == "Alto")
+> baixos <- baixos %>% sample_n(size = nrow(altos) * 3)
+> train_data_bal <- bind_rows(altos, baixos)
+> 
+> ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+> set.seed(123)
+modelo_rna <- train(FloodRisk ~ .,
+                    data = train_data_bal,
+                    method = "nnet",
+                    trControl = ctrl,
+                    metric = "ROC",
+                    tuneLength = 5,
+                    trace = FALSE)
+
+print(modelo_rna)
+Neural Network 
+
+11688 samples
+   20 predictor
+    2 classes: 'Alto', 'Baixo' 
+
+No pre-processing
+Resampling: Cross-Validated (5 fold) 
+Summary of sample sizes: 9351, 9351, 9350, 9350, 9350 
+Resampling results across tuning parameters:
+
+  size  decay  ROC        Sens       Spec     
+  1     0e+00  1.0000000  1.0000000  1.0000000
+  1     1e-04  0.9955999  0.9996575  0.9904219
+  1     1e-03  1.0000000  1.0000000  1.0000000
+  1     1e-02  1.0000000  1.0000000  1.0000000
+  1     1e-01  1.0000000  1.0000000  0.9993155
+  3     0e+00  0.9995973  0.9986319  0.9996577
+  3     1e-04  1.0000000  1.0000000  0.9997718
+  3     1e-03  0.9999986  1.0000000  0.9995436
+  3     1e-02  1.0000000  1.0000000  0.9995436
+  3     1e-01  0.9999984  1.0000000  0.9977183
+  5     0e+00  1.0000000  0.9993162  1.0000000
+  5     1e-04  0.9999998  0.9996581  0.9997719
+  5     1e-03  0.9999922  1.0000000  0.9997719
+  5     1e-02  0.9999992  1.0000000  0.9993155
+  5     1e-01  0.9999914  0.9996575  0.9966916
+  7     0e+00  0.9997126  0.9996575  0.9995436
+  7     1e-04  1.0000000  0.9996575  1.0000000
+  7     1e-03  0.9999949  0.9993151  0.9992014
+  7     1e-02  0.9999980  1.0000000  0.9988592
+  7     1e-01  0.9999836  0.9989726  0.9966916
+  9     0e+00  0.9998238  0.9989738  1.0000000
+  9     1e-04  0.9999996  1.0000000  0.9996579
+  9     1e-03  0.9936641  0.9979487  0.9594980
+  9     1e-02  0.9999877  0.9979464  0.9979467
+  9     1e-01  0.9999959  1.0000000  0.9972620
+
+ROC was used to select the optimal model using the largest value.
+The final values used for the model were size = 1 and decay = 0.1.
+> 
+
+> ## 4. Avaliação do Modelo
+
+# Previsões e probabilidades
+pred_rna <- predict(modelo_rna, newdata = test_data)
+> prob_rna <- predict(modelo_rna, newdata = test_data, type = "prob")
+> # Matrizes de confusão
+conf_rna <- confusionMatrix(pred_rna, test_data$FloodRisk)
+> print(conf_rna)
+Confusion Matrix and Statistics
+
+          Reference
+Prediction  Alto Baixo
+     Alto    417     2
+     Baixo     0 14580
+                                     
+               Accuracy : 0.9999     
+                 95% CI : (0.9995, 1)
+    No Information Rate : 0.9722     
+    P-Value [Acc > NIR] : <2e-16     
+                                     
+                  Kappa : 0.9975     
+                                     
+ Mcnemar's Test P-Value : 0.4795     
+                                     
+            Sensitivity : 1.00000    
+            Specificity : 0.99986    
+         Pos Pred Value : 0.99523    
+         Neg Pred Value : 1.00000    
+             Prevalence : 0.02780    
+         Detection Rate : 0.02780    
+   Detection Prevalence : 0.02794    
+      Balanced Accuracy : 0.99993    
+                                     
+       'Positive' Class : Alto       
+                                     
+> # Salvar matrizes de confusão
+write.csv(as.data.frame(conf_rna$table), "resultados/matriz_confusao_rna.csv", row.names = FALSE)
+> roc_rna <- roc(response = test_data$FloodRisk,
+               predictor = prob_rna[["Alto"]],
+               levels = rev(levels(test_data$FloodRisk)))
+Setting direction: controls < cases
+> plot(roc_rna, main = "Curva ROC - RNA com SMOTE")
+> auc(roc_rna)
+Area under the curve: 1
+> # Preparar dados para ggplot
+roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specificities, Modelo = "RNA")
+> roc_data <- bind_rows(roc_rna_data)
+> grafico_roc <- ggplot(roc_data, aes(x = FPR, y = TPR, color = Modelo)) +
+  geom_line(linewidth = 1.2) +
+  geom_abline(linetype = "dashed", color = "gray") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Curvas ROC - RNA",
+    subtitle = paste0("AUC RNA: ", round(auc(roc_rna), 3)),
+    x = "Taxa de Falsos Positivos (1 - Especificidade)",
+    y = "Taxa de Verdadeiros Positivos (Sensibilidade)",
+    color = "Modelo"
+  ) +
+  theme(
+  ) legend.position = "bottom"xt(size = 12),,
+> # Mostrar o gráfico
+print(grafico_roc)
+> # Salvar o gráfico
+ggsave("resultados/curva_roc_rna_smote.png", plot = grafico_roc, width = 8, height = 6, dpi = 300)
+> # Calcular acurácias
+acuracia_rna <- conf_rna$overall["Accuracy"]
+> texto_acuracia <- paste0("Acurácia RNA: ", round(acuracia_rna, 4))
+writeLines(texto_acuracia, "resultados/acuracia_resultados.txt")
+> 

@@ -4,15 +4,11 @@
 
 Foi utilizado um dataset simulado com:
 
-- 300 registros entre 2022-01-01 e 2022-10-27
+- 50.000 registros e 21 variáveis (incluindo a variável-alvo FloodProbability)
 
 Variáveis:
 
-- cidade, precipitacao_mm, umidade_solo, nivel_mar_m, elevacao_m, uso_solo, enchente
-
-Cidades selecionadas: 
-
-- Itajaí, Balneário Camboriú, Navegantes, Florianópolis, entre outras
+- Colunas: variáveis relacionadas a características ambientais e sociais (ex: MonsoonIntensity (Intensidade das Monções), Urbanization (Urbanização), DrainageSystems (Sistemas de Drenagem), etc.), com FloodProbability (Probabilidade de Inundação) como variável alvo, sendo a mesma numérica contínua (não multiclasse), sendo um problema de regressão (prever uma probabilidade numérica de inundação) - A variável-alvo FloodProbability é contínua, parecendo ser uma probabilidade entre 0 e 1.
 
 ### Metodologia
 

@@ -1,8 +1,6 @@
 ---
-title: "Previsão de Enchentes com Redes Neurais Artificiais - v2.0"
-output:
-  html_document: default
-  pdf_document: default
+title: "Previsão de Enchentes com Redes Neurais Artificiais - v1.0"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -12,18 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ## 1. Carregar pacotes e preparar ambiente
 
 # Carregar pacotes necessários (comente install.packages se já tiver instalado)
-#install.packages(c("tidyverse", "caret", "nnet", "pROC", "ggplot2"))
+#install.packages(c("tidyverse", "caret", "nnet", "pROC", "randomForest", "ggplot2"))
 
-# install.packages("rmarkdown", "knitr")
-# Rodar no bash para gerar o arquivo html/pdf e não esquecer de transformar os arquivos R em Rmd para execução
-# Rscript -e "rmarkdown::render('Previsao_Enchentes_dataset_flood.Rmd')"
-# Rscript -e "rmarkdown::render('Previsao_Enchentes_dataset_flood.Rmd', output_format = 'pdf_document')"
-# Rscript -e "rmarkdown::render('relatorio.Rmd', output_format = 'pdf_document')"
+# install.packages("rmarkdown")
 
 library(tidyverse)
 library(caret)
 library(nnet)
 library(pROC)
+library(randomForest)
 library(ggplot2)
 
 # Criar pasta 'resultados' para salvar saídas, se não existir
@@ -34,6 +29,7 @@ if (!dir.exists("resultados")) {
 # Carregar o dataset
 dados <- read.csv("dataset_flood.csv")
 str(dados)
+
 
 ## 2. Pré-processamento dos dados
 
@@ -90,23 +86,41 @@ modelo_rna <- train(FloodProbability ~ .,
 
 print(modelo_rna)
 
-## 4. Avaliação do Modelo
 
-# Previsões RNA
+## 4. Treinamento do Random Forest (Baseline)
+
+set.seed(123)
+modelo_rf <- train(FloodProbability ~ .,
+                   data = train_data,
+                   method = "rf",
+                   trControl = ctrl,
+                  #  metric = "ROC",
+                   tuneLength = 3)
+
+print(modelo_rf)
+
+## 5. Avaliação dos Modelos
+
+# Previsões RNA e RF
 pred_rna <- predict(modelo_rna, newdata = test_data)
+pred_rf <- predict(modelo_rf, newdata = test_data)
 
 # Matrizes de confusão
 conf_rna <- confusionMatrix(pred_rna, test_data$FloodProbability)
+conf_rf <- confusionMatrix(pred_rf, test_data$FloodProbability)
 
 print(conf_rna)
+print(conf_rf)
 
 # Salvar matrizes de confusão
 write.csv(as.data.frame(conf_rna$table), "resultados/matriz_confusao_rna.csv", row.names = FALSE)
+write.csv(as.data.frame(conf_rf$table), "resultados/matriz_confusao_rf.csv", row.names = FALSE)
 
 # Calcular acurácias
 acuracia_rna <- conf_rna$overall["Accuracy"]
+acuracia_rf  <- conf_rf$overall["Accuracy"]
 
 # Salvar AUCs em txt
-texto_acuracia <- paste0("Acurácia RNA: ", round(acuracia_rna, 4))
+texto_acuracia <- paste0("Acurácia RNA: ", round(acuracia_rna, 4), "\nAcurácia Random Forest: ", round(acuracia_rf, 4))
 writeLines(texto_acuracia, "resultados/acuracia_resultados.txt")
 
