@@ -5,6 +5,50 @@ library(pROC)
 library(ggplot2)
 library(DMwR2)
 library(smotefamily)
+# library(MuMIn)
+library(glmnet)
+── Attaching core tidyverse packages ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse 2.0.0 ──
+✔ dplyr     1.1.4     ✔ readr     2.1.5
+✔ forcats   1.0.0     ✔ stringr   1.5.1
+✔ ggplot2   3.5.2     ✔ tibble    3.2.1
+✔ lubridate 1.9.4     ✔ tidyr     1.3.1
+✔ purrr     1.0.4     
+── Conflicts ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── tidyverse_conflicts() ──
+✖ purrr::%||%()   masks base::%||%()
+✖ dplyr::filter() masks stats::filter()
+✖ dplyr::lag()    masks stats::lag()
+ℹ Use the conflicted package (<http://conflicted.r-lib.org/>) to force all conflicts to become errors
+Carregando pacotes exigidos: lattice
+^[[200~if (!dir.exists("resultados")) {
+  dir.create("resultados")
+}^[[201~
+
+Anexando pacote: ‘caret’
+
+O seguinte objeto é mascarado por ‘package:purrr’:
+
+    lift
+
+Type 'citation("pROC")' for a citation.
+
+Anexando pacote: ‘pROC’
+
+Os seguintes objetos são mascarados por ‘package:stats’:
+
+    cov, smooth, var
+
+Registered S3 method overwritten by 'quantmod':
+  method            from
+  as.zoo.data.frame zoo 
+Carregando pacotes exigidos: Matrix
+
+Anexando pacote: ‘Matrix’
+
+Os seguintes objetos são mascarados por ‘package:tidyr’:
+
+    expand, pack, unpack
+
+Loaded glmnet 4.1-8
 > if (!dir.exists("resultados")) {
   dir.create("resultados")
 }
@@ -32,42 +76,6 @@ str(dados)
  $ InadequatePlanning             : int  2 1 3 6 3 3 4 4 5 4 ...
  $ PoliticalFactors               : int  6 3 6 10 4 2 8 5 7 8 ...
  $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
-> library(tidyverse)
-library(caret)
-library(nnet)
-library(pROC)
-library(ggplot2)
-library(DMwR2)
-library(smotefamily)
-> if (!dir.exists("resultados")) {
-  dir.create("resultados")
-}
-> dados <- read.csv("dataset_flood.csv")
-str(dados)
-'data.frame':   50000 obs. of  21 variables:
- $ MonsoonIntensity               : int  3 8 3 4 3 6 6 7 6 4 ...
- $ TopographyDrainage             : int  8 4 10 4 7 6 7 3 3 3 ...
- $ RiverManagement                : int  6 5 4 2 5 6 4 5 5 5 ...
- $ Deforestation                  : int  6 7 1 7 2 4 5 5 4 6 ...
- $ Urbanization                   : int  4 7 7 3 5 6 5 6 5 2 ...
- $ ClimateChange                  : int  4 9 5 4 8 4 5 6 11 3 ...
- $ DamsQuality                    : int  6 1 4 1 5 3 4 6 3 7 ...
- $ Siltation                      : int  2 5 7 4 2 1 8 7 2 7 ...
- $ AgriculturalPractices          : int  3 5 4 6 7 3 8 6 9 10 ...
- $ Encroachments                  : int  2 4 9 4 5 5 4 5 7 4 ...
- $ IneffectiveDisasterPreparedness: int  5 6 2 9 7 1 6 5 8 5 ...
- $ DrainageSystems                : int  10 9 7 4 7 10 8 4 2 7 ...
- $ CoastalVulnerability           : int  7 2 4 2 6 5 4 6 8 6 ...
- $ Landslides                     : int  4 6 4 6 5 9 5 9 7 5 ...
- $ Watersheds                     : int  2 2 8 6 3 5 4 7 5 6 ...
- $ DeterioratingInfrastructure    : int  3 1 6 8 3 5 7 10 4 7 ...
- $ PopulationScore                : int  4 1 1 8 4 7 7 6 9 5 ...
- $ WetlandLoss                    : int  3 9 8 6 4 3 5 5 6 7 ...
- $ InadequatePlanning             : int  2 1 3 6 3 3 4 4 5 4 ...
- $ PoliticalFactors               : int  6 3 6 10 4 2 8 5 7 8 ...
- $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
->
-> 
 > dados <- dados %>%
   mutate(FloodRisk = ifelse(FloodProbability >= 0.6, "Alto", "Baixo"),
          FloodRisk = as.factor(FloodRisk))
@@ -82,7 +90,8 @@ str(dados)
     ),
     .fns = scale
   ))
-> str(dados_norm)
+> # Conferir se deu certo
+str(dados_norm)
 'data.frame':   50000 obs. of  22 variables:
  $ MonsoonIntensity               : num [1:50000, 1] -0.89 1.345 -0.89 -0.443 -0.89 ...
   ..- attr(*, "scaled:center")= num 4.99
@@ -146,12 +155,14 @@ str(dados)
   ..- attr(*, "scaled:scale")= num 2.25
  $ FloodProbability               : num  0.45 0.475 0.515 0.52 0.475 0.47 0.57 0.585 0.58 0.555 ...
  $ FloodRisk                      : Factor w/ 2 levels "Alto","Baixo": 2 2 2 2 2 2 2 2 2 2 ...
-> 
 > set.seed(42)
 train_index <- createDataPartition(dados_norm$FloodRisk, p = 0.7, list = FALSE) # Troca da variável alvo
 train_data <- dados_norm[train_index, ]
 test_data <- dados_norm[-train_index, ]
-> train_data$FloodRisk_num <- ifelse(train_data$FloodRisk == "Alto", 1, 0)
+> ## 2.1 Aplicando SMOTE no treino
+
+# Convertendo alvo para binário numérico (SMOTE do smotefamily precisa disso)
+train_data$FloodRisk_num <- ifelse(train_data$FloodRisk == "Alto", 1, 0)
 > smote_result <- SMOTE(X = train_data[, -which(names(train_data) %in% c("FloodRisk", "FloodProbability", "FloodRisk_num"))],
                       target = train_data$FloodRisk_num,
                       K = 5,
@@ -162,20 +173,57 @@ train_data_bal$FloodRisk <- as.factor(ifelse(train_data_bal$class == 1, "Alto", 
 train_data_bal$class <- NULL
 > baixos <- train_data_bal %>% filter(FloodRisk == "Baixo")
 altos <- train_data_bal %>% filter(FloodRisk == "Alto")
-> baixos <- baixos %>% sample_n(size = nrow(altos) * 3)
-> train_data_bal <- bind_rows(altos, baixos)
-> 
-> ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+> # Manter 3x mais baixos do que altos
+baixos <- baixos %>% sample_n(size = nrow(altos) * 3)
+> # Juntar
+train_data_bal <- bind_rows(altos, baixos)
+> dados_lasso <- train_data_bal %>%
+  select(-FloodRisk)
+> x <- as.matrix(dados_lasso)
+> y <- ifelse(train_data_bal$FloodRisk == "Alto", 1, 0)
+> cv_lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+^[[200~plot(cv_lasso)^[[201~
+> plot(cv_lasso)
+> coef_lasso <- coef(cv_lasso, s = "lambda.min")
+> variaveis_selecionadas <- rownames(coef_lasso)[coef_lasso[, 1] != 0]
+variaveis_selecionadas <- setdiff(variaveis_selecionadas, "(Intercept)")
+> print(variaveis_selecionadas)
+ [1] "MonsoonIntensity"                "TopographyDrainage"             
+ [3] "RiverManagement"                 "Deforestation"                  
+ [5] "Urbanization"                    "ClimateChange"                  
+ [7] "DamsQuality"                     "Siltation"                      
+ [9] "AgriculturalPractices"           "Encroachments"                  
+[11] "IneffectiveDisasterPreparedness" "DrainageSystems"                
+[13] "CoastalVulnerability"            "Landslides"                     
+[15] "Watersheds"                      "DeterioratingInfrastructure"    
+[17] "PopulationScore"                 "WetlandLoss"                    
+[19] "InadequatePlanning"              "PoliticalFactors"               
+> formula_rna <- as.formula(paste("FloodRisk ~", paste(variaveis_selecionadas, collapse = " + ")))
 > set.seed(123)
-modelo_rna <- train(FloodRisk ~ .,
-                    data = train_data_bal,
-                    method = "nnet",
-                    trControl = ctrl,
-                    metric = "ROC",
-                    tuneLength = 5,
-                    trace = FALSE)
+modelo_rna_lasso <- train(formula_rna,
+                          data = train_data_bal,
+                          method = "nnet",
+                          trControl = ctrl,
+                          metric = "ROC",
+                          tuneLength = 5,
+                          trace = FALSE)
 
-print(modelo_rna)
+print(modelo_rna_lasso)
+Erro: objeto 'ctrl' não encontrado
+> ## 3. Treinamento da Rede Neural (RNA) - com dados balanceados
+
+ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+> formula_rna <- as.formula(paste("FloodRisk ~", paste(variaveis_selecionadas, collapse = " + ")))
+> set.seed(123)
+modelo_rna_lasso <- train(formula_rna,
+                          data = train_data_bal,
+                          method = "nnet",
+                          trControl = ctrl,
+                          metric = "ROC",
+                          tuneLength = 5,
+                          trace = FALSE)
+
+print(modelo_rna_lasso)
 Neural Network 
 
 11688 samples
@@ -216,13 +264,16 @@ Resampling results across tuning parameters:
 
 ROC was used to select the optimal model using the largest value.
 The final values used for the model were size = 1 and decay = 0.1.
-> 
-
 > ## 4. Avaliação do Modelo
 
 # Previsões e probabilidades
 pred_rna <- predict(modelo_rna, newdata = test_data)
-> prob_rna <- predict(modelo_rna, newdata = test_data, type = "prob")
+Erro: objeto 'modelo_rna' não encontrado
+> ## 4. Avaliação do Modelo
+
+# Previsões e probabilidades
+pred_rna <- predict(modelo_rna_lasso, newdata = test_data)
+> prob_rna <- predict(modelo_rna_lasso, newdata = test_data, type = "prob")
 > # Matrizes de confusão
 conf_rna <- confusionMatrix(pred_rna, test_data$FloodRisk)
 > print(conf_rna)
@@ -262,9 +313,8 @@ Setting direction: controls < cases
 > plot(roc_rna, main = "Curva ROC - RNA com SMOTE")
 > auc(roc_rna)
 Area under the curve: 1
-> # Preparar dados para ggplot
-roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specificities, Modelo = "RNA")
-> roc_data <- bind_rows(roc_rna_data)
+> roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specificities, Modelo = "RNA")
+roc_data <- bind_rows(roc_rna_data)
 > grafico_roc <- ggplot(roc_data, aes(x = FPR, y = TPR, color = Modelo)) +
   geom_line(linewidth = 1.2) +
   geom_abline(linetype = "dashed", color = "gray") +
@@ -277,7 +327,10 @@ roc_rna_data <- data.frame(TPR = roc_rna$sensitivities, FPR = 1 - roc_rna$specif
     color = "Modelo"
   ) +
   theme(
-  ) legend.position = "bottom"xt(size = 12),,
+    plot.title = element_text(face = "bold"),
+    plot.subtitle = element_text(size = 12),
+    legend.position = "bottom"
+  )
 > # Mostrar o gráfico
 print(grafico_roc)
 > # Salvar o gráfico
@@ -286,4 +339,3 @@ ggsave("resultados/curva_roc_rna_smote.png", plot = grafico_roc, width = 8, heig
 acuracia_rna <- conf_rna$overall["Accuracy"]
 > texto_acuracia <- paste0("Acurácia RNA: ", round(acuracia_rna, 4))
 writeLines(texto_acuracia, "resultados/acuracia_resultados.txt")
-> 
