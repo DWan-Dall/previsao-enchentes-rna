@@ -79,13 +79,7 @@ AUC Random Forest: 0.9415
 
 ### ✍️ Autoria
 Projeto desenvolvido para o Mestrado Profissional em Computação Aplicada - UNIVALI<br>
-Matéria: INTRODUÇÃO A INTELIGÊNCIA ARTIFICIAL<br>
-Professores:
-<br>
- - Anita Maria da Rocha Fernandes
- - Raimundo Celeste Ghizoni Teive
- - Rudimar Luiz Scaranto Dazzi
-<br>
+
 Auxílio de suporte técnico da OpenAI ChatGPT<br>
 Adaptado e customizado por <a href="https://github.com/DWan-Dall">DWD</a>💜.
 
